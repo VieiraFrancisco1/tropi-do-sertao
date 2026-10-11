@@ -3,7 +3,7 @@ if(LIVE){
  const owner=()=>cloudSession?.owner===true;
  const baseShowDialog=showDialog,baseRenderAccount=renderAccount,baseRenderAdmin=renderAdmin;
  const baseCurrentReport=currentReport,baseRenderReport=renderReport,baseOpenPrint=openPrint;
- const reports=new Map();let reportRequest=0,submitting=false,connection=null;
+ const reports=new Map();let reportRequest=0,submitting=false,connection=null,authPage='login';
  const notificationLabels={pending:'Na fila',retry:'Nova tentativa agendada',sending:'Enviando',accepted:'Aceita pelo WhatsApp',sent:'Enviada',delivered:'Entregue',read:'Lida',failed:'Falha no envio',unknown:'Envio a conferir',blocked:'Configuração pendente',disabled:'Envio não ativado','no-consent':'Cliente não autorizou',superseded:'Etapa já atualizada'};
  function copyLive(scope){
   const mappings=[
@@ -25,7 +25,7 @@ if(LIVE){
   while((node=walk.nextNode())){if(node.parentElement?.closest('script,style'))continue;let value=node.nodeValue;for(const [from,to]of mappings)value=value.split(from).join(to);node.nodeValue=value;}
  }
  function cloudError(error){
-  const messages={'auth/invalid-credential':'Confira o email e a senha.','auth/email-already-in-use':'Este email já tem uma conta. Use Entrar.','auth/weak-password':'Use uma senha com pelo menos 6 caracteres.','auth/too-many-requests':'Aguarde alguns minutos e tente novamente.','auth/network-request-failed':'Confira sua conexão e tente novamente.'};
+  const messages={'auth/invalid-credential':'Telefone ou senha incorretos.','auth/email-already-in-use':'Este telefone já está cadastrado. Use Entrar.','auth/weak-password':'Use uma senha com pelo menos 6 caracteres.','auth/too-many-requests':'Aguarde alguns minutos e tente novamente.','auth/network-request-failed':'Confira sua conexão e tente novamente.'};
   toast(messages[error?.code]||error?.message||'Não foi possível conectar. Tente novamente.');
  }
  function refreshVisible(){
@@ -45,15 +45,17 @@ if(LIVE){
   $('account-dialog').querySelector('.sheet-top .eyebrow').textContent=owner()?'PAINEL DO LOJISTA':'SUA CONTA';
   if(!owner()){
    if(cloudSession&&!cloudSession.anonymous){
-    $('account-content').innerHTML=`<div class="owner-heading"><span class="owner-menu-icon">${svg('user')}</span><div><h3>Sua conta</h3><p>${esc(cloudSession.email)}</p></div></div><div class="owner-menu"><button data-action="orders">${svg('receipt')}<strong>Meus pedidos</strong><small>Acompanhe cada etapa</small></button><button data-action="club">${svg('gift')}<strong>Meu cartão</strong><small>Fidelidade TropiSertão</small></button></div><button class="secondary full" data-cloud-logout>Sair da conta</button>`;
+    $('account-content').innerHTML=`<div class="owner-heading"><span class="owner-menu-icon">${svg('user')}</span><div><h3>Minha conta</h3><p>Seus pedidos e benefícios Tropi do Sertão</p></div></div><div class="owner-menu"><button data-action="orders">${svg('receipt')}<strong>Meus pedidos</strong><small>Acompanhe as etapas da compra</small></button><button data-action="club">${svg('gift')}<strong>Meu cartão fidelidade</strong><small>Acompanhe seus benefícios</small></button></div><button class="secondary full" data-cloud-logout>Sair da conta</button>`;
    }else{
-    $('account-content').innerHTML=`<h3>Acesse sua conta</h3><p>Clientes acompanham pedidos e fidelidade. O acesso do dono libera a gestão da loja.</p><form id="cloud-auth-form"><label class="field-label" for="cloud-email">Email</label><input class="text-input" type="email" id="cloud-email" name="email" autocomplete="username" required><label class="field-label" for="cloud-password">Senha</label><input class="text-input" type="password" id="cloud-password" name="password" minlength="6" autocomplete="current-password" required><button class="primary full" type="submit" name="intent" value="login">Entrar</button><button class="secondary full" type="submit" name="intent" value="register">Criar conta de cliente</button></form><button class="text-button" data-action="orders">Acompanhar pedidos neste dispositivo</button>`;
+    const registering=authPage==='register';
+    $('account-content').innerHTML=`<h3>${registering?'Criar conta':'Entrar'}</h3><p>${registering?'Cadastre seu telefone e uma senha para acompanhar seus pedidos.':'Acesse seus pedidos e seu cartão fidelidade.'}</p><form id="cloud-auth-form" data-mode="${registering?'register':'login'}"><label class="field-label" for="cloud-phone">Telefone com DDD</label><input class="text-input" type="tel" id="cloud-phone" name="phone" inputmode="tel" autocomplete="tel-national" placeholder="(88) 99999-9999" maxlength="20" required><label class="field-label" for="cloud-password">Senha</label><input class="text-input" type="password" id="cloud-password" name="password" minlength="8" autocomplete="${registering?'new-password':'current-password'}" required><button class="primary full" type="submit">${registering?'Criar conta':'Entrar'}</button></form><button type="button" class="secondary full" data-cloud-auth-page="${registering?'login':'register'}">${registering?'Já tenho conta · Entrar':'Criar conta'}</button>${registering?'<p class="help-text">O número informado não será verificado por SMS. Guarde sua senha.</p>':''}`;
    }
    $('account-title').textContent='Minha conta';return;
   }
   baseRenderAccount();copyLive($('account-content'));
   $('account-content').querySelector('.owner-demo').textContent='LOJA';
   $('account-content').querySelector('.owner-example')?.remove();
+  const settings=$('account-content').querySelector('[data-action="about"] strong');if(settings)settings.textContent='Configurações da loja';
   $('account-content').insertAdjacentHTML('beforeend',`<p class="help-text">WhatsApp: ${connection?.whatsappEnabled?'envio automático ativado':'integração preparada; envio desativado'}.</p><button class="secondary full" data-cloud-logout>Sair da conta</button>`);
  };
  renderAdmin=function(){
@@ -143,6 +145,7 @@ if(LIVE){
     toast(states[result.order.status]+'. '+(result.order.notifications?.[result.order.status]?'WhatsApp: '+(notificationLabels[result.order.notifications[result.order.status].state]||'atualizado')+'.':''));
    }catch(error){cloudError(error);}finally{status.disabled=false;}return;
   }
+  const page=e.target.closest('[data-cloud-auth-page]');if(page){e.preventDefault();e.stopImmediatePropagation();authPage=page.dataset.cloudAuthPage;renderAccount();return;}
   const logout=e.target.closest('[data-cloud-logout]');if(logout){e.stopImmediatePropagation();try{await CLOUD.logout();renderAccount();}catch(error){cloudError(error);}return;}
   if(e.target.closest('[data-action="sample-orders"]')){e.stopImmediatePropagation();toast('Pedidos de exemplo ficam apenas na apresentação.');}
  },true);
@@ -150,8 +153,8 @@ if(LIVE){
   if(e.target.id!=='cloud-auth-form')return;e.preventDefault();
   const form=e.target,data=new FormData(form),buttons=[...form.querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);
   try{
-   const method=e.submitter?.value==='register'?'register':'login';await CLOUD[method](String(data.get('email')).trim(),String(data.get('password')));
-   form.reset();renderAccount();toast('Conta acessada.');
+   const method=form.dataset.mode==='register'?'register':'login';await CLOUD[method](String(data.get('phone')).trim(),String(data.get('password')));
+   form.reset();authPage='login';renderAccount();toast(method==='register'?'Conta criada. Bem-vindo!':'Você entrou na sua conta.');
   }catch(error){cloudError(error);}finally{buttons.forEach(b=>b.disabled=false);}
  });
  $('customer-phone').required=true;$('customer-phone').previousElementSibling.querySelector('small').textContent='com DDD';

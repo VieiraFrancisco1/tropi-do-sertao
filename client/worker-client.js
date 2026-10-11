@@ -1,3 +1,4 @@
+import { phoneLoginAlias } from './phone-login.js';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, EmailAuthProvider, linkWithCredential, signOut, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, collection, doc, query, where, orderBy, limit, onSnapshot, connectFirestoreEmulator } from 'firebase/firestore';
@@ -45,7 +46,7 @@ window.TropiCloud = {
         const result = await user.getIdTokenResult();
         if (version !== sessionVersion) return;
         const owner = result.claims.tropiAdmin === true;
-        hooks.onSession({ uid: user.uid, owner, anonymous: user.isAnonymous, email: user.email || '' });
+        hooks.onSession({ uid: user.uid, owner, anonymous: user.isAnonymous });
         const ordersQuery = owner
           ? query(collection(db, 'orders'), orderBy('date', 'desc'), limit(1000))
           : query(collection(db, 'orders'), where('customer.id', '==', user.uid), orderBy('date', 'desc'), limit(200));
@@ -57,14 +58,14 @@ window.TropiCloud = {
       } catch (e) { if (version === sessionVersion) { rejectReady(e); hooks.onError(e); } }
     }, hooks.onError);
   },
-  async login(email, password) { await ready; await signInWithEmailAndPassword(auth, email, password); },
-  async register(email, password) {
+  async login(phone, password) { await ready; await signInWithEmailAndPassword(auth, await phoneLoginAlias(phone), password); },
+  async register(phone, password) {
     await ready;
     if (!auth.currentUser?.isAnonymous) throw new Error('Saia da conta atual para criar outra.');
-    await linkWithCredential(auth.currentUser, EmailAuthProvider.credential(email, password));
+    await linkWithCredential(auth.currentUser, EmailAuthProvider.credential(await phoneLoginAlias(phone), password));
     // Linking keeps the guest UID and its existing orders/card.
     const user = auth.currentUser;
-    hooks.onSession({ uid: user.uid, owner: false, anonymous: false, email: user.email || '' });
+    hooks.onSession({ uid: user.uid, owner: false, anonymous: false });
   },
   async logout() { stop(); await signOut(auth); },
   createOrder: data => call('createOrder', data),
