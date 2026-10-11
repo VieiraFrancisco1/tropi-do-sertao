@@ -1,0 +1,13 @@
+import { readFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+const at=process.argv.indexOf('--project');
+const project=at===-1?'':process.argv[at+1];
+if(!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(project)||project.startsWith('demo-'))throw new Error('Informe --project com ID real do Firebase.');
+const metadata=JSON.parse(await readFile(new URL('../dist/build-info.json',import.meta.url),'utf8'));
+if(metadata.mode!=='worker'||metadata.emulators||metadata.projectId!==project)throw new Error('Compile primeiro o modo Worker com configuração do mesmo projeto real.');
+const cli=fileURLToPath(new URL('../node_modules/firebase-tools/lib/bin/firebase.js',import.meta.url));
+const config=fileURLToPath(new URL('../firebase.spark.json',import.meta.url));
+const result=spawnSync(process.execPath,[cli,'deploy','--project',project,'--config',config,'--only','hosting,firestore:rules,firestore:indexes'],{stdio:'inherit',shell:false});
+if(result.error)throw result.error;
+process.exitCode=result.status??1;

@@ -1,0 +1,49 @@
+import { readFile, writeFile, mkdir, readdir, copyFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const args = process.argv.slice(2), option = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
+const mode = option('--mode', 'demo');
+if (!['demo', 'firebase', 'worker'].includes(mode)) throw new Error('Escolha --mode demo, --mode firebase ou --mode worker.');
+const read = name => readFile(path.join(root, name), 'utf8');
+await mkdir(path.join(root, 'functions/lib'), { recursive: true });
+const logic = await read('logic.js');
+await writeFile(path.join(root, 'functions/lib/catalog.cjs'), logic + '\nmodule.exports = globalThis.TropiRules;\n');
+let config = { mode: 'demo' }, cloud = 'window.TropiCloud=null;';
+if (mode === 'firebase' || mode === 'worker') {
+  const name = option('--config', 'config/firebase.local.json');
+  config = JSON.parse(await readFile(path.resolve(root, name), 'utf8'));
+  for (const field of ['apiKey', 'authDomain', 'projectId', 'appId']) {
+    if (!config.firebase?.[field] || /SEU_|YOUR_|EXEMPLO/i.test(config.firebase[field])) throw new Error('Preencha a configuração Firebase: ' + field);
+  }
+  if (!config.emulators && !config.appCheckSiteKey) throw new Error('Configure a chave pública do App Check antes de preparar a versão real.');
+  if (config.emulators && !config.firebase.projectId.startsWith('demo-')) throw new Error('Testes locais devem usar projectId começando por demo-.');
+  if (mode === 'worker' && (!config.workerApiUrl || !/^https:\/\/[a-zA-Z0-9.-]+(?::\d+)?$/.test(config.workerApiUrl))) throw new Error('Configure workerApiUrl HTTPS antes de publicar.');
+  config.mode = mode; config.functionsRegion ||= 'southamerica-east1';
+  const { build } = await import('esbuild');
+  const result = await build({ entryPoints: [path.join(root, mode === 'worker' ? 'client/worker-client.js' : 'client/firebase-client.js')], bundle: true, format: 'iife', target: ['es2022'], minify: true, write: false });
+  cloud = result.outputFiles[0].text;
+}
+let html = await read('src.html'), css = await read('style.css'), js = await read('app.js');
+js = js.replace('// CLOUD_BRIDGE', await read('client/cloud-ui.inc.js'));
+const assets = {};
+for (const name of await readdir(path.join(root, 'assets'))) {
+  if (name.endsWith('.webp')) assets['assets/' + name] = 'data:image/webp;base64,' + (await readFile(path.join(root, 'assets', name))).toString('base64');
+}
+html = html.replace(/assets\/[\w-]+\.webp/g, name => assets[name]);
+for (const name of css.matchAll(/assets\/[\w-]+\.woff/g)) {
+  const url = 'data:font/woff;base64,' + (await readFile(path.join(root, name[0]))).toString('base64');
+  css = css.replaceAll(name[0], url);
+}
+js = js.replace('const asset=path=>path;', 'const bundledAssets=' + JSON.stringify(assets) + ';\nconst asset=path=>bundledAssets[path]||path;');
+const configScript = 'window.TropiConfig=' + JSON.stringify(config).replaceAll('<', '\\u003c') + ';';
+for (const source of [logic, js, cloud]) if (/<\/script/i.test(source)) throw new Error('Fechamento de script inesperado.');
+html = html.replace('<link rel="stylesheet" href="style.css">', '<style>' + css + '</style>')
+  .replace('<script src="logic.js"></script>', '<script>' + configScript + logic + '</script><script>' + cloud + '</script>')
+  .replace('<script src="app.js"></script>', '<script>' + js + '</script>');
+await mkdir(path.join(root, 'dist'), { recursive: true });
+await writeFile(path.join(root, 'dist/index.html'), html);
+if (mode === 'demo') await writeFile(path.join(root, 'index.html'), html);
+await copyFile(path.join(root, 'preview.html'), path.join(root, 'dist/preview.html'));
+await writeFile(path.join(root, 'dist/build-info.json'), JSON.stringify({ mode, projectId: config.firebase?.projectId || null, emulators: !!config.emulators, builtAt: new Date().toISOString() }, null, 2));
+console.log('Build ' + mode + ': ' + Buffer.byteLength(html) + ' bytes. Saída: dist/');

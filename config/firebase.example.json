@@ -1,0 +1,12 @@
+{
+  "mode": "firebase",
+  "firebase": {
+    "apiKey": "",
+    "authDomain": "",
+    "projectId": "",
+    "appId": ""
+  },
+  "functionsRegion": "southamerica-east1",
+  "appCheckSiteKey": "",
+  "emulators": false
+}

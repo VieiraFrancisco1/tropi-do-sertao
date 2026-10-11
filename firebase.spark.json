@@ -1,0 +1,16 @@
+{
+  "hosting": {
+    "public": "dist",
+    "ignore": ["firebase.spark.json", "**/.*", "**/node_modules/**"],
+    "headers": [
+      { "source": "**", "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" }
+      ] },
+      { "source": "/index.html", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+    ],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+  },
+  "firestore": { "rules": "firestore.rules", "indexes": "firestore.indexes.json" }
+}

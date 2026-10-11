@@ -1,0 +1,26 @@
+[
+  {
+    "name": "tropi_pedido_em_preparo",
+    "language": "pt_BR",
+    "category": "UTILITY",
+    "components": [
+      {
+        "type": "BODY",
+        "text": "Olá, {{1}}! A TropiSertão aceitou seu pedido {{2}} e já começou o preparo. Você pode acompanhar as próximas etapas pelo site. Para parar de receber atualizações no WhatsApp, responda SAIR.",
+        "example": { "body_text": [["Maria", "TROPI-001"]] }
+      }
+    ]
+  },
+  {
+    "name": "tropi_pedido_saiu_entrega",
+    "language": "pt_BR",
+    "category": "UTILITY",
+    "components": [
+      {
+        "type": "BODY",
+        "text": "Olá, {{1}}! Seu pedido {{2}} da TropiSertão saiu para entrega no endereço informado. Por favor, tenha alguém disponível para recebê-lo. Para parar de receber atualizações no WhatsApp, responda SAIR.",
+        "example": { "body_text": [["Maria", "TROPI-001"]] }
+      }
+    ]
+  }
+]

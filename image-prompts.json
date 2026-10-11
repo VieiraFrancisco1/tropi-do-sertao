@@ -1,0 +1,37 @@
+[
+  {
+    "id": "sanduiche-natural",
+    "prompt": "Use case: product-mockup. Asset type: fotografia quadrada para card de cardápio de delivery TropiSertão. Fotografia de comida realista e natural, apetitosa, sem aparência de ilustração ou plástico. Série consistente: mesma bancada de madeira clara, mesmo fundo verde escuro desfocado, luz suave de janela vinda da esquerda, sombras delicadas e quentes. Enquadramento quadrado, câmera a 35 graus sobre a bancada, objeto inteiro bem centralizado, área segura de 12% nas bordas para cortes responsivos. Sem mãos, pessoas, preços, banners, logotipos, rótulos com marcas ou textos. Subject: exatamente UM sanduíche natural de pão integral com frango desfiado, cenoura ralada, milho, ervilha, maionese, requeijão cremoso e alface. Duas fatias de pão integral de tamanho normal, recheio fiel e moderado visível, cortado em duas metades triangulares juntas sobre um pequeno prato cerâmico creme. Não incluir hambúrguer, bacon, tomate, queijo em fatias, batata frita, suco ou sobremesa. Pão com textura verdadeira, recheio fresco, fotografia de catálogo atraente.",
+    "mode": "built-in image_gen",
+    "source": "/workspace/scratch/40c9fbffea6e/generated_images/exec-5f8b079a-3cf1-49f9-af18-9ca1995a34bd.png",
+    "projectAsset": "assets/sanduiche-natural.webp"
+  },
+  {
+    "id": "suco-laranja",
+    "prompt": "Use case: product-mockup. Asset type: fotografia quadrada para card de cardápio de delivery TropiSertão. Fotografia de comida realista e natural, apetitosa, sem aparência de ilustração ou plástico. Série consistente: mesma bancada de madeira clara, mesmo fundo verde escuro desfocado, luz suave de janela vinda da esquerda, sombras delicadas e quentes. Enquadramento quadrado, câmera a 35 graus sobre a bancada, objeto inteiro bem centralizado, área segura de 12% nas bordas para cortes responsivos. Sem mãos, pessoas, preços, banners, logotipos, rótulos com marcas ou textos. Subject: exatamente UMA garrafa pequena transparente de 300 ml de suco natural de LARANJA, tampa preta de rosca, sem rótulo e sem texto. Garrafa cilíndrica baixa com ombros arredondados, totalmente visível, líquido laranja vivo com textura natural discreta. Uma laranja cortada e uma folha discreta ao lado da base para indicar o sabor. Sem outras bebidas, sem açúcar ou gelo, sem copos ou canudos. Garrafa ocupa 65% da altura útil, foto fiel a suco artesanal brasileiro.",
+    "mode": "built-in image_gen",
+    "source": "/workspace/scratch/40c9fbffea6e/generated_images/exec-c7c95eb6-54c9-477e-bece-3a7c5d2a3c62.png",
+    "projectAsset": "assets/suco-laranja.webp"
+  },
+  {
+    "id": "suco-abacaxi-hortela",
+    "prompt": "Use case: product-mockup. Asset type: fotografia quadrada para card de cardápio de delivery TropiSertão. Fotografia de comida realista e natural, apetitosa, sem aparência de ilustração ou plástico. Série consistente: mesma bancada de madeira clara, mesmo fundo verde escuro desfocado, luz suave de janela vinda da esquerda, sombras delicadas e quentes. Enquadramento quadrado, câmera a 35 graus sobre a bancada, objeto inteiro bem centralizado, área segura de 12% nas bordas para cortes responsivos. Sem mãos, pessoas, preços, banners, logotipos, rótulos com marcas ou textos. Subject: exatamente UMA garrafa pequena transparente de 300 ml de suco natural de ABACAXI COM HORTELÃ, tampa preta de rosca, sem rótulo e sem texto. Garrafa cilíndrica baixa com ombros arredondados, totalmente visível, líquido amarelo claro com pequenos vestígios verdes naturais de hortelã. Dois pedaços de abacaxi e um ramo pequeno de hortelã ao lado da base para indicar o sabor. Sem outras bebidas, sem açúcar ou gelo, sem copos ou canudos. Garrafa ocupa 65% da altura útil, foto fiel a suco artesanal brasileiro.",
+    "mode": "built-in image_gen",
+    "source": "/workspace/scratch/40c9fbffea6e/generated_images/exec-3367750d-8401-4cad-8d90-83638dd590e3.png",
+    "projectAsset": "assets/suco-abacaxi-hortela.webp"
+  },
+  {
+    "id": "suco-maracuja",
+    "prompt": "Use case: product-mockup. Asset type: fotografia quadrada para card de cardápio de delivery TropiSertão. Fotografia de comida realista e natural, apetitosa, sem aparência de ilustração ou plástico. Série consistente: mesma bancada de madeira clara, mesmo fundo verde escuro desfocado, luz suave de janela vinda da esquerda, sombras delicadas e quentes. Enquadramento quadrado, câmera a 35 graus sobre a bancada, objeto inteiro bem centralizado, área segura de 12% nas bordas para cortes responsivos. Sem mãos, pessoas, preços, banners, logotipos, rótulos com marcas ou textos. Subject: exatamente UMA garrafa pequena transparente de 300 ml de suco natural de MARACUJÁ, tampa preta de rosca, sem rótulo e sem texto. Garrafa cilíndrica baixa com ombros arredondados, totalmente visível, líquido amarelo dourado opaco e natural. Um maracujá amarelo inteiro e uma metade mostrando polpa com sementes ao lado da base para indicar o sabor. Não encher a garrafa de sementes pretas, suco deve parecer coado artesanal. Sem outras bebidas, sem açúcar ou gelo, sem copos ou canudos. Garrafa ocupa 65% da altura útil, foto fiel a suco artesanal brasileiro.",
+    "mode": "built-in image_gen",
+    "source": "/workspace/scratch/40c9fbffea6e/generated_images/exec-c771afa0-a5eb-4bc1-9cb0-fe6a0f207df5.png",
+    "projectAsset": "assets/suco-maracuja.webp"
+  },
+  {
+    "id": "combo-tropi",
+    "prompt": "Use case: product-mockup. Asset type: fotografia quadrada para card de cardápio de delivery TropiSertão. Fotografia de comida realista e natural, apetitosa, sem aparência de ilustração ou plástico. Série consistente: mesma bancada de madeira clara, mesmo fundo verde escuro desfocado, luz suave de janela vinda da esquerda, sombras delicadas e quentes. Enquadramento quadrado, câmera a 35 graus sobre a bancada, objeto inteiro bem centralizado, área segura de 12% nas bordas para cortes responsivos. Sem mãos, pessoas, preços, banners, logotipos, rótulos com marcas ou textos. Subject: exatamente UM kit de lanche natural brasileiro, em uma bandeja branca simples sobre a bancada. Inclui exatamente um sanduíche de duas fatias de pão integral com frango desfiado, cenoura ralada, milho, ervilha, maionese, requeijão cremoso e alface; exatamente uma pequena garrafa transparente de 300 ml com tampa preta e suco natural de laranja, sem rótulo; exatamente um potinho pequeno transparente de 145 ml de salada de frutas com banana, mamão, manga e uva. Mostrar apenas esses três componentes, inteiros e sem sobreposição, sanduíche à esquerda, garrafa à direita e potinho à frente. Tamanho do potinho deve ser menor que a garrafa. Não incluir outros kits, embalagens com marcas, frutas que não estejam citadas, hambúrgueres ou acompanhamentos. A composição deve parecer um kit real, saudável e acessível, apropriado para card de R$17.",
+    "mode": "built-in image_gen",
+    "source": "/workspace/scratch/40c9fbffea6e/generated_images/exec-aa9a42c1-0972-4584-b450-7f75de58bc83.png",
+    "projectAsset": "assets/combo-tropi.webp"
+  }
+]

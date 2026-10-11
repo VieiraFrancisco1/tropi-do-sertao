@@ -1,0 +1,11 @@
+{
+  "indexes": [
+    { "collectionGroup": "orders", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "customer.id", "order": "ASCENDING" }, { "fieldPath": "date", "order": "DESCENDING" }] },
+    { "collectionGroup": "messageJobs", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "state", "order": "ASCENDING" }, { "fieldPath": "nextAttemptAt", "order": "ASCENDING" }] },
+    { "collectionGroup": "messageJobs", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "state", "order": "ASCENDING" }, { "fieldPath": "leaseUntil", "order": "ASCENDING" }] }
+  ],
+  "fieldOverrides": [
+    { "collectionGroup": "orders", "fieldPath": "lines", "indexes": [] },
+    { "collectionGroup": "cashSessions", "fieldPath": "entries", "indexes": [] }
+  ]
+}

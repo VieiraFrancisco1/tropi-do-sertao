@@ -1,0 +1,28 @@
+{
+  "hosting": {
+    "public": "dist",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "headers": [
+      { "source": "**", "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" }
+      ]},
+      { "source": "/index.html", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+    ],
+    "rewrites": [
+      { "source": "/api/whatsapp/webhook", "function": { "functionId": "whatsappWebhook", "region": "southamerica-east1" } },
+      { "source": "**", "destination": "/index.html" }
+    ]
+  },
+  "firestore": { "rules": "firestore.rules", "indexes": "firestore.indexes.json" },
+  "functions": [{ "source": "functions", "codebase": "tropisertao", "runtime": "nodejs22", "ignore": ["test/**", "node_modules", ".git", "**/*.log", ".env.example", ".secret.local"] }],
+  "emulators": {
+    "auth": { "port": 9099 },
+    "firestore": { "port": 8080 },
+    "functions": { "port": 5001 },
+    "hosting": { "port": 5000 },
+    "ui": { "enabled": true, "port": 4000 },
+    "singleProjectMode": true
+  }
+}

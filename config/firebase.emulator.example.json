@@ -1,0 +1,12 @@
+{
+  "mode": "firebase",
+  "firebase": {
+    "apiKey": "demo-api-key",
+    "authDomain": "demo-tropisertao.firebaseapp.com",
+    "projectId": "demo-tropisertao",
+    "appId": "1:000000000000:web:local-emulator"
+  },
+  "functionsRegion": "southamerica-east1",
+  "appCheckSiteKey": "",
+  "emulators": true
+}

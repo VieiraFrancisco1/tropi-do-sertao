@@ -1,0 +1,25 @@
+name = "tropisertao-api"
+main = "index.mjs"
+compatibility_date = "2026-10-11"
+compatibility_flags = ["nodejs_compat"]
+preview_urls = false
+
+# Configuracao PUBLICA: nao coloque segredos aqui.
+[vars]
+FIREBASE_PROJECT_ID = "tropisertao-854d3"
+ALLOWED_ORIGINS = "https://tropisertao-proposta.vercel.app,https://tropisertao-854d3.web.app,https://tropisertao-854d3.firebaseapp.com,https://tropidosertao.web.app,https://tropidosertao.firebaseapp.com"
+WHATSAPP_ENABLED = "false"
+WHATSAPP_PHONE_NUMBER_ID = ""
+WHATSAPP_WABA_ID = ""
+WHATSAPP_GRAPH_API_VERSION = ""
+WHATSAPP_TEMPLATE_PREPARO = "tropi_pedido_em_preparo"
+WHATSAPP_TEMPLATE_ENTREGA = "tropi_pedido_saiu_entrega"
+
+[triggers]
+crons = ["*/2 * * * *"]
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true

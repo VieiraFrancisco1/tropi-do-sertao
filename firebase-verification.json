@@ -1,0 +1,30 @@
+{
+  "preparedAt": "2026-10-11",
+  "scope": "Preparação de código, sem ativação de serviços reais",
+  "legacyBusinessRules": "passed",
+  "backendUnitTests": { "passed": 9, "failed": 0 },
+  "firestoreIntegrationTests": { "passed": 8, "failed": 0, "projectId": "demo-tropisertao" },
+  "covered": [
+    "Preços calculados no servidor",
+    "Pedidos/carimbos idempotentes",
+    "Privacidade e regras Firestore",
+    "Permissão administrativa",
+    "Transições de status e fila por etapa",
+    "Envio concorrente com transporte fictício",
+    "Assinatura e ordem dos callbacks",
+    "Consentimento e interrupção de mensagens",
+    "Timeout sem reenvio automático",
+    "Caixa, relatório mensal, resgate e cancelamento"
+  ],
+  "firebaseSdkBuild": "passed with emulator-only configuration",
+  "coreFunctionExports": 5,
+  "fullFunctionExports": 8,
+  "coreSecretParameters": 0,
+  "placeholderConfigRejected": true,
+  "emulatorDeploymentRejected": true,
+  "coreEmulatorStartup": "passed",
+  "browserEndToEnd": "pending; cloud browser cannot reach local server",
+  "firebaseDeployed": false,
+  "realWhatsAppMessagesSent": 0,
+  "existingVercelDeploymentChanged": false
+}

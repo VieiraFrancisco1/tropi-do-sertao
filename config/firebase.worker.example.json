@@ -1,0 +1,12 @@
+{
+  "mode": "worker",
+  "firebase": {
+    "apiKey": "",
+    "authDomain": "",
+    "projectId": "",
+    "appId": ""
+  },
+  "appCheckSiteKey": "",
+  "emulators": false,
+  "workerApiUrl": "https://tropisertao-api.SUA-CONTA.workers.dev"
+}

@@ -1,0 +1,50 @@
+{
+  "checkedAt": "2026-10-09T17:37:18.131181+00:00",
+  "story": "Novas categorias Lanches, Sucos e Combos; sanduíche R$7, três sucos de 300 ml a R$7 e combo de R$17 com escolha obrigatória do suco.",
+  "architecture": "Proposta estática. UI → regras em JavaScript → localStorage → UI. Não há API, banco de dados ou envio de WhatsApp.",
+  "deploymentId": "dpl_2o4utnwrTg8AjnfBEB1UBgiTzUbn",
+  "publicUrl": "https://tropisertao-proposta.vercel.app/",
+  "http": 200,
+  "servedSha256": "92a33a3948d41e9df9029f55d18ffe3d5ec188c15874576375624d981bc2e07e",
+  "sourceMatchesPublic": true,
+  "checks": [
+    "node --check app.js e logic.js; node logic.test.js: regras anteriores e preços/validação/carrinho/ranking dos novos produtos aprovados.",
+    "As cinco fotos foram geradas antes de inserir os produtos. WEBPs de 720 px e prompts incluídos no projeto.",
+    "Browser CUA: montagem de combo R$17 bloqueada antes da escolha; selecionar maracujá habilita a inclusão.",
+    "Browser CUA: dois combos com sucos diferentes em linhas separadas, total R$34.",
+    "Browser CUA: sanduíche R$7 com ingredientes e suco avulso de abacaxi/hortelã R$7; quatro itens no checkout com total R$48.",
+    "Browser CUA: pedido demonstrativo TROPI-001 registrado em Meus pedidos e no painel do dono; comanda conserva os dois sabores e o total R$48.",
+    "Browser CUA: imagem do combo carregada, tela de 320 px sem overflow horizontal; screenshot final de 390 px."
+  ],
+  "console": "Erros de metadados da extensão chrome-extension, alheios ao site; nenhum erro de app observado.",
+  "limits": [
+    "Tudo demonstrativo e local neste navegador",
+    "WhatsApp: somente prévia, nenhum envio",
+    "Sem autenticação, sincronização ou pagamento real"
+  ],
+  "previousOwnerVerification": {
+    "checkedAt": "2026-10-09",
+    "story": "Minha conta do lojista: relatórios diário/semanal/mensal, aceite e etapas do pedido com prévias de mensagem, abertura/movimentação/fechamento de caixa local.",
+    "architecture": "Proposta estática. UI → regras em JavaScript → localStorage → UI. Não há API, banco de dados ou envio de WhatsApp.",
+    "deploymentId": "dpl_2yEonnpg2HUruUhi2AWWzEgC1jkQ",
+    "publicUrl": "https://tropisertao-proposta.vercel.app/",
+    "http": 200,
+    "servedSha256": "6459092d83c35e845fe62255cb8b0f5efc3a58e7c2bbf65f5d6749a1ebd7addc",
+    "sourceMatchesPublic": true,
+    "checks": [
+      "node --check app.js e logic.js",
+      "node logic.test.js: preço/fidelidade, períodos Fortaleza, semana entre anos, ranking, transições, dinheiro em centavos, sessão única, retirada limitada, vendas idempotentes e histórico imutável",
+      "Browser CUA: seis pedidos fictícios; aceitar EXEMPLO-001 → preparo → entrega → finalizado com prévias de WhatsApp; EXEMPLO-003 finalizado; quatro finalizados, um ativo, um cancelado, vendas de R$54",
+      "Browser CUA: diário/semanal/mensal com R$54, ticket R$13,50, Pix R$28, Dinheiro R$16, Cartão R$10, 500 ml 3 copos e 300 ml 1 copo; impressão do relatório",
+      "Browser CUA: abrir caixa R$100 + entrada R$20 − retirada R$5 + venda em dinheiro R$16 = dinheiro esperado R$131; Pix R$16 separado; vendas desta sessão R$32",
+      "Browser CUA: fechar com R$130 → diferença −R$1, histórico e prévia imprimível; persistência após recarregar",
+      "Browser CUA: painel 320 px sem overflow horizontal e screenshot final 390 px"
+    ],
+    "console": "Foram observados erros de metadados da extensão do navegador (chrome-extension), alheios ao site.",
+    "limits": [
+      "Tudo demonstrativo e local neste navegador",
+      "WhatsApp: somente prévia, nenhum envio",
+      "Sem autenticação, sincronização ou pagamento real"
+    ]
+  }
+}
