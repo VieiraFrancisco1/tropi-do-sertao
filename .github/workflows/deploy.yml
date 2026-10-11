@@ -1,0 +1,64 @@
+name: Testar e publicar Tropi do Sertao
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tropi-producao
+  cancel-in-progress: false
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:worker
+      - run: node --test client/phone-login.test.mjs
+      - name: Gerar configuracao publica para validar build
+        env:
+          TROPI_APP_CHECK_SITE_KEY: mock-key-for-build-only
+        run: node scripts/create-github-config.mjs
+      - run: npm run build:worker
+  publicar:
+    needs: validar
+    if: github.ref == 'refs/heads/main' && vars.TROPI_DEPLOY_READY == 'true'
+    runs-on: ubuntu-latest
+    environment: producao
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Gerar configuracao publica de producao
+        env:
+          TROPI_APP_CHECK_SITE_KEY: ${{ vars.TROPI_APP_CHECK_SITE_KEY }}
+        run: node scripts/create-github-config.mjs
+      - run: npm run preflight
+      - run: npm run build:worker
+      - name: Publicar Worker existente sem remover secrets
+        run: npx --yes wrangler@4.149.0 deploy --config worker/wrangler.toml --keep-vars
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Autenticar no Firebase apenas para Hosting
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_HOSTING_DEPLOY_JSON }}
+      - name: Publicar Hosting somente do site tropidosertao
+        run: npx firebase deploy --project tropisertao-854d3 --config firebase.github.json --only hosting
+      - name: Verificar a publicacao
+        run: |
+          node scripts/check-worker-live.mjs https://tropisertao-api.0vieira-francisco0.workers.dev https://tropidosertao.web.app
+          curl --fail --silent --show-error --location https://tropidosertao.web.app/ -o /dev/null
