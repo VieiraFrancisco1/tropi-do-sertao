@@ -10,6 +10,10 @@ FIREBASE_PROJECT_ID = "tropisertao-854d3"
 FIREBASE_APP_ID = "1:356550892810:web:11cd031fd88b08d4d62ef3"
 ALLOWED_ORIGINS = "https://tropisertao-proposta.vercel.app,https://tropisertao-854d3.web.app,https://tropisertao-854d3.firebaseapp.com,https://tropidosertao.web.app,https://tropidosertao.firebaseapp.com"
 WHATSAPP_ENABLED = "false"
+# Limite conservador de 1000 tentativas de mensagens de atendimento por mes.
+# Manter desligado ate conectar o webhook e credenciais do numero oficial.
+WHATSAPP_MONTHLY_CAP = "1000"
+WHATSAPP_BILLING_TIME_ZONE = "America/Fortaleza"
 WHATSAPP_PHONE_NUMBER_ID = ""
 WHATSAPP_WABA_ID = ""
 WHATSAPP_GRAPH_API_VERSION = ""
