@@ -12,8 +12,10 @@ function configure(env, dependency={}) {
   const serviceAccount=JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON||'{}');
   const db=dependency.db||createFirestore({projectId:env.FIREBASE_PROJECT_ID,serviceAccount});
   const enabled=env.WHATSAPP_ENABLED==='true' && !!env.WHATSAPP_ACCESS_TOKEN && !!env.WHATSAPP_PHONE_NUMBER_ID && !!env.WHATSAPP_GRAPH_API_VERSION;
+  const monthlyCap=Number(env.WHATSAPP_MONTHLY_CAP || 1000);
+  if (!Number.isInteger(monthlyCap) || monthlyCap < 1 || monthlyCap > 1000) throw new Error('Invalid WHATSAPP_MONTHLY_CAP (1-1000)');
   const service=createService({db,whatsappEnabled:()=>enabled});
-  const whatsapp=createWhatsApp({db,config:()=>({enabled,phoneNumberId:env.WHATSAPP_PHONE_NUMBER_ID,wabaId:env.WHATSAPP_WABA_ID,version:env.WHATSAPP_GRAPH_API_VERSION,token:env.WHATSAPP_ACCESS_TOKEN,appSecret:env.WHATSAPP_APP_SECRET,preparoTemplate:env.WHATSAPP_TEMPLATE_PREPARO||'tropi_pedido_em_preparo',entregaTemplate:env.WHATSAPP_TEMPLATE_ENTREGA||'tropi_pedido_saiu_entrega',language:'pt_BR'})});
+  const whatsapp=createWhatsApp({db,config:()=>({enabled,phoneNumberId:env.WHATSAPP_PHONE_NUMBER_ID,wabaId:env.WHATSAPP_WABA_ID,version:env.WHATSAPP_GRAPH_API_VERSION,token:env.WHATSAPP_ACCESS_TOKEN,appSecret:env.WHATSAPP_APP_SECRET,preparoTemplate:env.WHATSAPP_TEMPLATE_PREPARO||'tropi_pedido_em_preparo',entregaTemplate:env.WHATSAPP_TEMPLATE_ENTREGA||'tropi_pedido_saiu_entrega',language:'pt_BR',monthlyCap,billingTimeZone:env.WHATSAPP_BILLING_TIME_ZONE||'America/Fortaleza'})});
   const expectedOrigins=new Set(String(env.ALLOWED_ORIGINS||'').split(',').map(s=>s.trim()).filter(Boolean));
   if(!expectedOrigins.size)throw new Error('Missing ALLOWED_ORIGINS');
   const authorize=dependency.authorize||((token)=>verifyFirebaseToken(token,env.FIREBASE_PROJECT_ID));
