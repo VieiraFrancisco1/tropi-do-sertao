@@ -101,8 +101,9 @@ if(LIVE){
   const values=new FormData(e.currentTarget),payment=values.get('payment');
   const parsed=R.parseMoney(values.get('change')),change=payment==='Dinheiro'&&values.get('change')?parsed:0;
   if(change===null){toast('Confira o valor para troco.');return;}
-  const data={name:String(values.get('customer')||'').trim(),phone:String(values.get('phone')||''),payment,change,
-   delivery:values.get('delivery')==='entrega'?'Entrega':'Retirada',address:String(values.get('address')||''),reference:String(values.get('reference')||''),
+  const selected=e.currentTarget.querySelector('input[name="payment"]:checked');
+  const data={name:String(values.get('customer')||'').trim(),phone:String(values.get('phone')||''),payment,cardType:selected?.dataset.cardType||'',change,
+   delivery:values.get('delivery')==='entrega'?'Entrega':'Retirada',neighborhood:String(values.get('neighborhood')||''),address:String(values.get('address')||''),reference:String(values.get('reference')||''),
    whatsappOptIn:values.get('whatsappOptIn')==='on',lines:cart.map(l=>({...l,extras:[...l.extras]}))};
   const button=e.currentTarget.querySelector('[type="submit"]');submitting=true;button.disabled=true;
   const whatsappTab=beginWhatsAppHandoff();

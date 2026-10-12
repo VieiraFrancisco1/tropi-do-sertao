@@ -1,5 +1,7 @@
 (function(root){
 'use strict';
+const STORE=Object.freeze({address:'Rua José Leorne Leitão, Boa Viagem - CE (prédio do Marcos Eletro, em cima da Hortifruti)',deliveryTime:'30 a 50 minutos',pickupTime:'25 a 45 minutos',hours:[{"day":"Domingo","ranges":[]},{"day":"Segunda","ranges":[["09:00","12:00"],["14:00","17:00"]]},{"day":"Terça","ranges":[["09:00","12:00"],["14:00","17:00"]]},{"day":"Quarta","ranges":[["09:00","12:00"],["14:00","17:00"]]},{"day":"Quinta","ranges":[["14:00","17:00"]]},{"day":"Sexta","ranges":[["09:00","12:00"],["14:00","17:00"]]},{"day":"Sábado","ranges":[]}],neighborhoodFees:Object.freeze({"Alto do Motor":300,"Alto do Zé Rosa":300,"Anafuê":600,"Bairro de Fátima":300,"Boaviaginha":300,"Centro":0,"César Carls":300,"COHAB":300,"Floresta":500,"Macaxeira":300,"Padre Paulo":300,"Ponte Nova":300,"Queiroz":300,"Rações Nutriranch":600,"Recreio":300,"Sambra":300,"SEAC":300,"Tibiquari":300,"Várzea do Canto":300,"Vil Holanda":300,"Vila Azul":300})});
+const deliveryFeeCents=neighborhood=>Object.hasOwn(STORE.neighborhoodFees,neighborhood)?STORE.neighborhoodFees[neighborhood]:null;
 const PRODUCTS=[
  {id:'300',name:'Salada de frutas',size:'300 ml',price:600,kind:'salad',category:'saladas',image:'salada',description:'Banana, mamão, manga e uva.'},
  {id:'500',name:'Salada de frutas',size:'500 ml',price:1200,kind:'salad',category:'saladas',image:'salada',description:'Banana, mamão, manga e uva.'},
@@ -132,5 +134,5 @@ function validateCheckout(lines,loyalty){
   if(paid.length&&cartTotal(paid)<500)return 'O pedido mínimo é R$ 5,00.';
   return '';
 }
-root.TropiRules=Object.freeze({PRODUCTS,JUICES,EXTRAS,product,extra,validLine,unitPrice,cartTotal,lineTitle,lineDescription,lineLabel,STATUS_LABELS,nextStatus,canTransition,periodKey,periodBounds,orderReport,parseMoney,openCashSession,cashSummary,bookCashSale,cashMovement,closeCashSession,loyaltyState,validateCheckout});
+root.TropiRules=Object.freeze({STORE,deliveryFeeCents,PRODUCTS,JUICES,EXTRAS,product,extra,validLine,unitPrice,cartTotal,lineTitle,lineDescription,lineLabel,STATUS_LABELS,nextStatus,canTransition,periodKey,periodBounds,orderReport,parseMoney,openCashSession,cashSummary,bookCashSale,cashMovement,closeCashSession,loyaltyState,validateCheckout});
 })(typeof window==='undefined'?globalThis:window);

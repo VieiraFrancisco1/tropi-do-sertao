@@ -25,7 +25,7 @@ function createService({ db, clock = Date.now, whatsappEnabled = () => false }) 
       const order = {
         id, date: at, updatedAt: at, status: 'recebido', total: data.total,
         customer: { id: user.uid, name: data.name, phone: data.phone },
-        payment: data.payment, delivery: data.delivery, address: data.address, reference: data.reference,
+        payment: data.payment, cardType: data.cardType, delivery: data.delivery, neighborhood: data.neighborhood, deliveryFee: data.deliveryFee, payableTotal: data.payableTotal, address: data.address, reference: data.reference,
         change: data.change, lines: data.lines, reward: data.reward, redeemsReward: data.redeemsReward,
         whatsappConsent: { granted: data.whatsappOptIn, at, version: 'tropi-status-v1', text: OPT_IN_TEXT, source: 'checkout' },
         notifications: {}, statusHistory: [{ status: 'recebido', at, actor: user.uid }]

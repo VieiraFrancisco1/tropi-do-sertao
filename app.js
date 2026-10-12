@@ -8,6 +8,20 @@ let cloudSession=null,cloudLoyalty=null;
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n/100);
+function storeOpenNow(){
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Fortaleza',weekday:'long',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+ const pick=k=>parts.find(p=>p.type===k)?.value||'';
+ const i=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].indexOf(pick('weekday'));
+ if(i<0)return false;
+ const now=pick('hour')+':'+pick('minute');
+ return R.STORE.hours[i].ranges.some(([start,end])=>now>=start&&now<end);
+}
+function renderStoreInfo(){
+ const s=$('store-status');if(s){const open=storeOpenNow();s.classList.toggle('is-open',open);s.classList.toggle('is-closed',!open);s.innerHTML=svg('clock')+' '+(open?'Aberto agora':'Fechado agora')+' · Horários';}
+ const n=$('store-neighborhoods');if(n)n.innerHTML=Object.entries(R.STORE.neighborhoodFees).map(([name,fee])=>'<li><span>'+esc(name)+'</span><strong>'+money(fee)+'</strong></li>').join('');
+ const h=$('store-hours');if(h)h.innerHTML=R.STORE.hours.map(day=>'<li><strong>'+esc(day.day)+'</strong><span>'+(day.ranges.length?day.ranges.map(([a,b])=>a+'–'+b).join(' · '):'Fechado')+'</span></li>').join('');
+}
+
 
 const STORE_WHATSAPP_NUMBER='5588996862960';
 function whatsappOrderUrl(order){
@@ -20,10 +34,13 @@ function whatsappOrderUrl(order){
   '*Itens do pedido:*',
   ...order.lines.map(item=>'- '+item.label+' — '+money(item.subtotal)+(item.notes?'\n  Observação: '+item.notes:'')),
   '',
-  '*Total dos produtos: '+money(order.total)+'*',
+  'Produtos: '+money(order.total),
+  ...(order.delivery==='Entrega'?['Taxa de entrega: '+money(order.deliveryFee||0)]:[]),
+  '*Total: '+money(order.payableTotal??order.total)+'*',
   'Recebimento: '+order.delivery,
+  ...(order.delivery==='Entrega'?['Bairro: '+order.neighborhood]:[]),
   ...(order.delivery==='Entrega'?['Endereço: '+order.address,...(order.reference?['Referência: '+order.reference]:[])]:[]),
-  'Pagamento: '+order.payment,
+  'Pagamento: '+order.payment+(order.cardType?' ('+order.cardType+')':''),
   ...(order.payment==='Dinheiro'&&order.change?['Troco para: '+money(order.change)]:[]),
   'Taxa de entrega e pagamento a confirmar com a loja.'
  ];
@@ -330,7 +347,7 @@ function openPrint(id){const o=orders.find(x=>x.id===id);if(!o)return;const html
 function startCheckout(){
  const error=R.validateCheckout(cart,loyalty());if(error){toast(error);return;}
  $('checkout-summary-items').innerHTML=cart.map(l=>`<div class="summary-line"><span>${l.qty}× ${esc(R.lineTitle(l))}${l.reward?'<small>Presente fidelidade</small>':''}${l.extras.length||R.product(l.productId).kind==='combo'?'<small>'+esc(R.lineDescription(l))+'</small>':''}${l.notes?'<small>Obs.: '+esc(l.notes)+'</small>':''}</span><strong>${money(R.unitPrice(l)*l.qty)}</strong></div>`).join('');
- $('checkout-total').textContent=money(total());$('customer-name').value=profile.name;$('customer-phone').value=profile.phone;showDialog('checkout-dialog');
+ $('checkout-total').textContent=money(total());$('customer-name').value=profile.name;$('customer-phone').value=profile.phone;deliveryFields();showDialog('checkout-dialog');
 }
 function submitOrder(e){
  e.preventDefault();const error=R.validateCheckout(cart,loyalty());if(error){toast(error);return;}
@@ -351,10 +368,20 @@ function submitOrder(e){
  $('success-loyalty').innerHTML=loyaltyMarkup(!order.reward);
  showDialog('success-dialog');
 }
-function deliveryFields(){const delivery=$('checkout-form').elements.delivery.value==='entrega';$('address-fields').hidden=!delivery;$('customer-address').required=delivery;$('delivery-help').textContent=delivery?'Taxa de entrega a confirmar com a loja.':'Local de retirada a combinar com a loja.';}
+function deliveryFields(){
+ const delivery=$('checkout-form').elements.delivery.value==='entrega';
+ $('address-fields').hidden=!delivery;$('customer-address').required=delivery;
+ const bairro=$('customer-neighborhood');bairro.required=delivery;
+ $('delivery-help').textContent=delivery?'Entrega: '+R.STORE.deliveryTime+'. Escolha o bairro para calcular a taxa.':'Retirada no balcão: '+R.STORE.pickupTime+'.';
+ const fee=delivery?R.deliveryFeeCents(bairro.value):0;
+ $('checkout-delivery-fee').textContent=fee===null?'Selecione um bairro':money(fee);
+ $('checkout-delivery-row').hidden=!delivery;
+ $('checkout-grand-total').textContent=fee===null?'—':money(total()+fee);
+}
 function paymentFields(){const cash=$('checkout-form').elements.payment.value==='Dinheiro';$('change-fields').hidden=!cash;if(!cash){$('customer-change').value='';$('customer-change').setCustomValidity('');}}
 // CLOUD_BRIDGE
 document.addEventListener('click',e=>{
+ const info=e.target.closest('[data-action="store-info"]');if(info){renderStoreInfo();showDialog('store-info-dialog');return;}
  const close=e.target.closest('[data-close]');if(close){closeDialog(close.closest('dialog'));return;}
  const p=e.target.closest('[data-product]');if(p){openBuilder(p.dataset.product);return;}
  const extra=e.target.closest('[data-extra]');if(extra){openBuilder('300',extra.dataset.extra);return;}
@@ -425,7 +452,7 @@ $('add-to-bag').addEventListener('click',()=>{
  if(match&&match.qty+line.qty<=20)match.qty+=line.qty;else cart.push(line);
  updateCart();closeDialog($('builder-dialog'));toast(line.reward?'Seu presente foi adicionado à sacola.':'Sua combinação está na sacola.');
 });
-$('start-checkout').addEventListener('click',startCheckout);$('checkout-form').addEventListener('submit',submitOrder);
+$('start-checkout').addEventListener('click',startCheckout);$('checkout-form').addEventListener('submit',submitOrder);$('customer-neighborhood').addEventListener('change',deliveryFields);
 document.querySelectorAll('input[name="delivery"]').forEach(i=>i.addEventListener('change',deliveryFields));
 document.querySelectorAll('input[name="payment"]').forEach(i=>i.addEventListener('change',paymentFields));
 $('customer-name').addEventListener('input',()=>$('customer-name').setCustomValidity(''));
@@ -440,5 +467,5 @@ function updatePause(){$('carousel-pause').setAttribute('aria-label',userPaused?
 $('carousel-pause').addEventListener('click',()=>{userPaused=!userPaused;updatePause();});
 $('banner').addEventListener('mouseenter',()=>hovering=true);$('banner').addEventListener('mouseleave',()=>hovering=false);
 setInterval(()=>{if(!userPaused&&!motion.matches&&!hovering&&!document.hidden&&!document.querySelector('dialog[open]')&&!$('banner').contains(document.activeElement))setSlide(slideIndex+1);},6500);
-paint();renderMenu();updateCart();updatePause();
+paint();renderMenu();updateCart();updatePause();renderStoreInfo();
 })();

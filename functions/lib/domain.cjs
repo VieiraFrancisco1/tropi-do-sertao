@@ -37,11 +37,16 @@ function sanitizeCheckout(input) {
   const address = input.delivery === 'Entrega' ? text(input.address, 180) : '';
   if (input.delivery === 'Entrega' && !address) fail('invalid-argument', 'Informe o endereço de entrega.');
   const total = R.cartTotal(lines);
+  const neighborhood = input.delivery === 'Entrega' ? text(input.neighborhood,60) : '';
+  const deliveryFee = input.delivery === 'Entrega' ? R.deliveryFeeCents(neighborhood) : 0;
+  if (deliveryFee === null) fail('invalid-argument', 'Escolha um bairro válido para entrega.');
+  const payableTotal = total + deliveryFee;
+  const cardType = input.payment === 'Cartão' && ['Débito','Crédito'].includes(input.cardType) ? input.cardType : '';
   const change = input.payment === 'Dinheiro' ? (input.change || 0) : 0;
-  if (!Number.isSafeInteger(change) || change < 0 || change > 999999999 || change && change < total) fail('invalid-argument', 'Revise o valor para troco.');
+  if (!Number.isSafeInteger(change) || change < 0 || change > 999999999 || change && change < payableTotal) fail('invalid-argument', 'Revise o valor para troco.');
   return {
     requestKey: key(input.requestKey), name, phone: phone(input.phone),
-    payment: input.payment, delivery: input.delivery, address,
+    payment: input.payment, cardType, delivery: input.delivery, neighborhood, deliveryFee, payableTotal, address,
     reference: input.delivery === 'Entrega' ? text(input.reference, 120) : '', change,
     whatsappOptIn: input.whatsappOptIn === true, total,
     lines: lines.map(l => ({ ...l, label: R.lineLabel(l), unitPrice: R.unitPrice(l), subtotal: R.unitPrice(l) * l.qty })),
