@@ -19,10 +19,26 @@ function configure(env, dependency={}) {
   const authorize=dependency.authorize||((token)=>verifyFirebaseToken(token,env.FIREBASE_PROJECT_ID));
   if(!dependency.checkApp&&!/^1:\d+:(web|android|ios):[a-zA-Z0-9]+$/.test(env.FIREBASE_APP_ID||''))throw new Error('Missing FIREBASE_APP_ID');
   const check=dependency.checkApp||((token)=>verifyAppCheck(token,env.FIREBASE_APP_ID));
+  let databaseCheck=null,databaseCheckAt=0;
+  function databaseHealth(){
+    if(!databaseCheck||Date.now()-databaseCheckAt>60000){
+      databaseCheckAt=Date.now();
+      databaseCheck=db.runTransaction(async tx=>{
+        // Exercise the checkout reads and roll back without creating any order,
+        // changing loyalty, advancing the counter or returning document data.
+        await tx.get(db.doc('orderRequests/tropi-health-check'));
+        await Promise.all(['controls/orderCounter','customers/tropi-health-check','orderRateLimits/tropi-health-check'].map(path=>tx.get(db.doc(path))));
+      }).then(()=>({status:'ok',database:'ok'})).catch(error=>({status:'unavailable',database:'unavailable',diagnostic:{status:Number.isInteger(error.status)?error.status:500,code:/^[A-Z_]{1,50}$/.test(error.code||'')?error.code:'INTERNAL'}}));
+    }
+    return databaseCheck;
+  }
   async function handle(req,ctx={waitUntil:()=>{}}){
     const url=new URL(req.url),path=url.pathname,origin=req.headers.get('origin')||'',allow=expectedOrigins.has(origin);
     const headers=allow?{'access-control-allow-origin':origin,'vary':'Origin','access-control-allow-headers':'Authorization, Content-Type, X-Firebase-AppCheck','access-control-allow-methods':'POST, OPTIONS','access-control-max-age':'600'}:{};
-    if(path==='/api/health')return json({status:'ok',whatsappEnabled:enabled},200,headers);
+    if(path==='/api/health'){
+      const health=await databaseHealth();
+      return json({...health,whatsappEnabled:enabled},health.status==='ok'?200:503,headers);
+    }
     if(path==='/api/whatsapp/webhook'){
       if(req.method==='GET')return req.headers.get('hub.mode')==='subscribe' && env.WHATSAPP_VERIFY_TOKEN && url.searchParams.get('hub.verify_token')===env.WHATSAPP_VERIFY_TOKEN?new Response(url.searchParams.get('hub.challenge')||'',{status:200}):new Response('Forbidden',{status:403});
       if(req.method!=='POST')return new Response('Method Not Allowed',{status:405});

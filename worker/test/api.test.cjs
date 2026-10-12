@@ -111,3 +111,27 @@ test('Firebase JWT signature, project, issuer and expiry are verified',async()=>
  await assert.rejects(verifyFirebaseToken(header+'.'+payload+'.'+sig.slice(0,-5)+'12345','demo-tropisertao',{fetchImpl:mock,now:()=>now}));
  await assert.rejects(verifyFirebaseToken(header+'.'+payload+'.'+sig,'wrong-project',{fetchImpl:mock,now:()=>now}));
 });
+
+test('health verifies checkout database reads once and never writes or exposes documents',async()=>{
+  const db=fakeDb();
+  db.store.set('controls/orderCounter',{value:42,privateNote:'not-for-health'});
+  const before=structuredClone([...db.store]);let checks=0;
+  const original=db.runTransaction;
+  db.runTransaction=async callback=>{checks++;return original(callback);};
+  const api=configure(baseEnv,{db,authorize:async()=>{throw new Error('Not needed for health');},checkApp:async()=>true});
+  for(let i=0;i<2;i++){
+    const response=await api.handle(new Request('https://tropi.workers.dev/api/health'));
+    assert.equal(response.status,200);
+    assert.deepEqual(await response.json(),{status:'ok',database:'ok',whatsappEnabled:false});
+  }
+  assert.equal(checks,1);
+  assert.deepEqual([...db.store],before);
+});
+
+test('health reports a database failure without leaking credentials or upstream messages',async()=>{
+  const db={runTransaction:async()=>{throw Object.assign(new Error('private token and account details'),{status:403,code:'PERMISSION_DENIED'});}};
+  const api=configure(baseEnv,{db,authorize:async()=>({uid:'u'}),checkApp:async()=>true});
+  const response=await api.handle(new Request('https://tropi.workers.dev/api/health'));
+  assert.equal(response.status,503);
+  assert.deepEqual(await response.json(),{status:'unavailable',database:'unavailable',diagnostic:{status:403,code:'PERMISSION_DENIED'},whatsappEnabled:false});
+});

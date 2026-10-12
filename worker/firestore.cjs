@@ -67,7 +67,10 @@ function createFirestore({ projectId, serviceAccount, fetchImpl = fetch, now = D
     const form = new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion:content+'.'+signed});
     const response=await fetchImpl('https://oauth2.googleapis.com/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:form.toString()});
     const result=await response.json();
-    if (!response.ok || !result.access_token) throw new Error('Could not authenticate Firebase service account');
+    if (!response.ok || !result.access_token) {
+      const code=['invalid_grant','invalid_client','unauthorized_client','invalid_scope'].includes(result.error)?result.error.toUpperCase():'OAUTH_UNAVAILABLE';
+      throw new DbError(response.status||503,'Could not authenticate Firebase service account',code);
+    }
     cachedToken=result.access_token;tokenExpires=now()+Math.min(result.expires_in||3300,3500)*1000;
     return cachedToken;
   }
