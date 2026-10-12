@@ -8,6 +8,53 @@ let cloudSession=null,cloudLoyalty=null;
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n/100);
+
+const STORE_WHATSAPP_NUMBER='5588996862960';
+function whatsappOrderUrl(order){
+ const details=[
+  '*PEDIDO - TROPI DO SERTÃO*',
+  'Número: '+order.id,
+  'Cliente: '+order.customer.name,
+  'Telefone: '+order.customer.phone,
+  '',
+  '*Itens do pedido:*',
+  ...order.lines.map(item=>'- '+item.label+' — '+money(item.subtotal)+(item.notes?'\\n  Observação: '+item.notes:'')),
+  '',
+  '*Total dos produtos: '+money(order.total)+'*',
+  'Recebimento: '+order.delivery,
+  ...(order.delivery==='Entrega'?['Endereço: '+order.address,...(order.reference?['Referência: '+order.reference]:[])]:[]),
+  'Pagamento: '+order.payment,
+  ...(order.payment==='Dinheiro'&&order.change?['Troco para: '+money(order.change)]:[]),
+  'Taxa de entrega e pagamento a confirmar com a loja.'
+ ];
+ return 'https://wa.me/'+STORE_WHATSAPP_NUMBER+'?text='+encodeURIComponent(details.join('\\n'));
+}
+function beginWhatsAppHandoff(){
+ const tab=window.open('about:blank','_blank');
+ if(tab)try{
+  tab.document.title='Preparando seu pedido - Tropi do Sertão';
+  tab.document.body.textContent='Aguarde, preparando sua mensagem para o WhatsApp...';
+ }catch{}
+ return tab;
+}
+function finishWhatsAppHandoff(order,tab){
+ const url=whatsappOrderUrl(order);
+ document.getElementById('success-whatsapp')?.remove();
+ const link=document.createElement('a');
+ link.id='success-whatsapp';
+ link.className='primary full';
+ link.href=url;
+ link.target='_blank';
+ link.rel='noopener noreferrer';
+ link.innerHTML=svg('whatsapp')+' Abrir WhatsApp para enviar';
+ $('success-receipt').insertAdjacentElement('afterend',link);
+ $('success-title').textContent='Pedido registrado!';
+ $('success-title').nextElementSibling.textContent='Finalize o envio da mensagem no WhatsApp. Abrir a conversa não garante que a mensagem foi enviada.';
+ showDialog('success-dialog');
+ if(tab)try{tab.location.replace(url);return;}catch{}
+ toast('Pedido registrado. Toque em "Abrir WhatsApp para enviar".');
+}
+
 const date=n=>new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'America/Fortaleza'}).format(n);
 const normal=v=>String(v).toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const uid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);

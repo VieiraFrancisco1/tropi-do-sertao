@@ -105,6 +105,7 @@ if(LIVE){
    delivery:values.get('delivery')==='entrega'?'Entrega':'Retirada',address:String(values.get('address')||''),reference:String(values.get('reference')||''),
    whatsappOptIn:values.get('whatsappOptIn')==='on',lines:cart.map(l=>({...l,extras:[...l.extras]}))};
   const button=e.currentTarget.querySelector('[type="submit"]');submitting=true;button.disabled=true;
+  const whatsappTab=beginWhatsAppHandoff();
   try{
    const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(data)));
    const fingerprint=[...new Uint8Array(bytes)].map(n=>n.toString(16).padStart(2,'0')).join('');
@@ -112,13 +113,14 @@ if(LIVE){
    if(pending?.fingerprint!==fingerprint)pending={fingerprint,key:uid()};
    save('tropisertao-live-checkout-key',pending);
    const result=await CLOUD.createOrder({...data,requestKey:pending.key}),order=result.order;
-   if(order.customer.id!==cloudSession?.uid){toast('Pedido registrado na conta anterior. Entre nela para acompanhar.');return;}
+   if(order.customer.id!==cloudSession?.uid){whatsappTab?.close();toast('Pedido registrado na conta anterior. Entre nela para acompanhar.');return;}
    cloudLoyalty=result.loyalty;profile={id:order.customer.id,name:order.customer.name,phone:order.customer.phone};
    orders=[order,...orders.filter(o=>o.id!==order.id)];cart=[];updateCart();
    localStorage.removeItem('tropisertao-live-checkout-key');$('checkout-form').reset();deliveryFields();paymentFields();
    $('success-receipt').innerHTML=`<span>${esc(order.id)}</span><strong>${money(order.total)}</strong>`;
-   $('success-loyalty').innerHTML=loyaltyMarkup(!order.reward);showDialog('success-dialog');
-  }catch(error){cloudError(error);}finally{submitting=false;button.disabled=false;}
+   $('success-loyalty').innerHTML=loyaltyMarkup(!order.reward);
+   finishWhatsAppHandoff(order,whatsappTab);
+  }catch(error){whatsappTab?.close();cloudError(error);}finally{submitting=false;button.disabled=false;}
  };
  cashFormSubmit=async function(e){
   const form=e.target;if(!['cash-open-form','cash-movement-form','cash-close-form'].includes(form.id))return;
@@ -157,6 +159,9 @@ if(LIVE){
    form.reset();authPage='login';renderAccount();toast(method==='register'?'Conta criada. Bem-vindo!':'Você entrou na sua conta.');
   }catch(error){cloudError(error);}finally{buttons.forEach(b=>b.disabled=false);}
  });
+ const checkoutButton=$('checkout-form').querySelector('[type="submit"]');
+ checkoutButton.innerHTML=svg('whatsapp')+' Enviar pedido para WhatsApp';
+ $('checkout-form').querySelector('.checkout-summary').insertAdjacentHTML('beforeend','<p class="help-text">O pedido será registrado quando você tocar em Enviar pedido para WhatsApp. Confira e envie a mensagem no aplicativo para avisar a loja.</p>');
  $('customer-phone').required=true;$('customer-phone').previousElementSibling.querySelector('small').textContent='com DDD';
  $('whatsapp-consent').hidden=false;
  CLOUD.start({
