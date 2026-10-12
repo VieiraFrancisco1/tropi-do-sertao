@@ -421,6 +421,7 @@ function deliveryFields(event){
  $('delivery-help').textContent=delivery?'Entrega: '+R.STORE.deliveryTime+'. Escolha o bairro para calcular a taxa.':'Retirada no balcão: '+R.STORE.pickupTime+'.';
  const fee=delivery?R.deliveryFeeCents(bairro.value):0;
  $('checkout-delivery-fee').textContent=fee===null?'Selecione um bairro':money(fee);
+ $('checkout-products-row').hidden=!delivery;
  $('checkout-delivery-row').hidden=!delivery;
  $('checkout-grand-total').textContent=fee===null?'—':money(total()+fee);
  $('checkout-grand-label').textContent=delivery?'Total com entrega':'Total do pedido';
