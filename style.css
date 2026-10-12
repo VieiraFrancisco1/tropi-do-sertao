@@ -161,7 +161,7 @@ html{scroll-padding-top:82px}.header-inner{min-height:76px;padding:6px 22px;grid
 
 /* Compact header, store information and proportional product previews. */
 html{scroll-padding-top:74px}.header-inner{min-height:68px;padding-top:4px;padding-bottom:4px}
-.brand{gap:1px}.brand img{width:44px;height:44px}.brand strong{margin-top:1px;line-height:1.15}
+.brand{gap:1px}.brand img{width:44px;height:44px}.brand strong{margin-top:1px;line-height:1.15;transform:translateY(3px)}
 .store-strip{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:stretch;gap:7px;flex-wrap:nowrap;max-width:1040px;margin:auto;padding:5px 12px;min-height:0}
 .store-strip>button,.minimum-info{min-width:0;min-height:34px;justify-content:center;margin:0;padding:4px 7px;border-radius:8px}
 .store-status span,.minimum-info>span:last-child{display:flex;flex-direction:column;align-items:flex-start;line-height:1.25;white-space:nowrap}
