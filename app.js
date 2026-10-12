@@ -76,20 +76,16 @@ function whatsappOrderUrl(order){
  return 'https://wa.me/'+STORE_WHATSAPP_NUMBER+'?text='+encodeURIComponent(details.join('\n'));
 }
 function finishWhatsAppHandoff(order,url=whatsappOrderUrl(order)){
- document.getElementById('success-whatsapp')?.remove();
- const link=document.createElement('a');
- link.id='success-whatsapp';
- link.className='primary full';
+ const link=$('success-whatsapp');
  link.href=url;
- link.target='_self';
- link.rel='noopener noreferrer';
- link.innerHTML=svg('whatsapp')+' Abrir WhatsApp para enviar';
- $('success-receipt').insertAdjacentElement('afterend',link);
+ $('success-whatsapp-footer').hidden=false;
+ $('success-receipt').innerHTML=`<span>${esc(order.id)}</span><strong>${money(order.payableTotal??order.total)}</strong>`;
  $('success-title').textContent='Pedido registrado!';
- $('success-title').nextElementSibling.textContent='Envie a mensagem no WhatsApp para avisar a loja.';
+ $('success-title').nextElementSibling.textContent='Toque em Enviar pedido para WhatsApp para abrir a conversa com sua mensagem pronta.';
  showDialog('success-dialog');
- try{window.location.assign(url);return;}catch{}
- toast('Pedido registrado. Toque em "Abrir WhatsApp para enviar".');
+ // Keep the final handoff as a native link: mobile app opening needs a fresh tap,
+ // which an asynchronous order registration cannot reliably preserve.
+ link.focus({preventScroll:true});
 }
 
 const date=n=>new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'America/Fortaleza'}).format(n);
@@ -427,6 +423,7 @@ function scrollToInfo(target){
 }
 function checkoutAddress(values){return String(values.get('address')||'').trim()+', '+String(values.get('houseNumber')||'').trim();}
 function resetCheckoutSteps(){
+ $('checkout-submit-status').hidden=true;$('checkout-submit-status').textContent='';
  $('payment-step').hidden=true;$('payment-step').disabled=true;$('checkout-summary').hidden=true;
  $('go-to-payment').hidden=false;$('send-order').hidden=true;$('send-order').disabled=true;
  document.querySelectorAll('input[name="payment"]').forEach(i=>i.checked=false);

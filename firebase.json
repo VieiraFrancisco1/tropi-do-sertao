@@ -8,7 +8,8 @@
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "X-Frame-Options", "value": "SAMEORIGIN" }
       ]},
-      { "source": "/index.html", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+      { "source": "/index.html", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+      { "source": "/", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
     ],
     "rewrites": [
       { "source": "/api/whatsapp/webhook", "function": { "functionId": "whatsappWebhook", "region": "southamerica-east1" } },

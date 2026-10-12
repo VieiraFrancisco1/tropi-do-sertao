@@ -9,9 +9,9 @@ assert.ok(begin>=0&&end>begin);
 const code=source.slice(begin,end);
 const ui=readFileSync(new URL('./cloud-ui.inc.js',import.meta.url),'utf8');
 const errorCode=ui.slice(ui.indexOf(' function cloudError(error){'),ui.indexOf('\n function refreshVisible(){'));
-function requestHarness(fetch,{schedule=setTimeout,cancel=clearTimeout}={}){
+function requestHarness(fetch,{schedule=setTimeout,cancel=clearTimeout,ready=Promise.resolve(),getToken=async()=>({token:'test-app-check-token'}),getIdToken=async()=> 'test-identity-token'}={}){
  return new Function('deps',`const {ready,auth,appCheck,getToken,config,fetch,AbortController,setTimeout,clearTimeout}=deps;${code};return call;`)({
-  ready:Promise.resolve(),auth:{currentUser:{getIdToken:async()=> 'test-identity-token'}},appCheck:{},getToken:async()=>({token:'test-app-check-token'}),
+  ready,auth:{currentUser:{getIdToken}},appCheck:{},getToken,
   config:{workerApiUrl:'https://example.test/'},fetch,AbortController,setTimeout:schedule,clearTimeout:cancel
  });
 }
@@ -57,4 +57,44 @@ test('um pedido sem resposta encerra a espera e libera uma nova tentativa',async
  abort();
  await assert.rejects(request,error=>error.code==='unavailable'&&/demorou a responder/.test(error.publicMessage));
  assert.equal(cancelled,true);
+});
+
+
+test('o prazo inclui a preparação da sessão e não registra um pedido depois de expirar',async()=>{
+ for(const stage of ['ready','getIdToken','getToken']){
+  let release,expire,cancelled=false,requests=0;
+  const pending=new Promise(resolve=>{release=resolve;});
+  const settings={schedule:(callback,delay)=>{assert.equal(delay,30000);expire=callback;return 7;},cancel:id=>{assert.equal(id,7);cancelled=true;}};
+  settings[stage]=stage==='ready'?pending:()=>pending;
+  const call=requestHarness(async()=>{requests++;return Response.json({});},settings);
+  const operation=call('createOrder',{});
+  // Let the authentication preparation reach the blocked await.
+  await Promise.resolve();await Promise.resolve();
+  expire();
+  await assert.rejects(operation,error=>error.code==='unavailable'&&/demorou/.test(error.publicMessage));
+  release(stage==='getToken'?{token:'late-token'}:'late-identity-token');
+  await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  assert.equal(requests,0);
+  assert.equal(cancelled,true);
+ }
+});
+
+test('o prazo inclui a leitura da resposta do servidor',async()=>{
+ let expire,reading,cancelled=false;
+ const started=new Promise(resolve=>{reading=resolve;});
+ const call=requestHarness(async()=>({ok:true,json(){reading();return new Promise(()=>{});}}),{
+  schedule:callback=>{expire=callback;return 8;},cancel:id=>{assert.equal(id,8);cancelled=true;}
+ });
+ const operation=call('createOrder',{});
+ await started;
+ expire();
+ await assert.rejects(operation,error=>/demorou a responder/.test(error.publicMessage));
+ assert.equal(cancelled,true);
+});
+
+test('a falha de preparação do App Check é legível e não cria pedido',async()=>{
+ let requests=0;
+ const call=requestHarness(async()=>{requests++;return Response.json({});},{getToken:async()=>{throw new Error('Technical token error');}});
+ await assert.rejects(call('createOrder',{}),error=>/verificar esta sessão/.test(error.publicMessage));
+ assert.equal(requests,0);
 });

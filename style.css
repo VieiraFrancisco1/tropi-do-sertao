@@ -207,3 +207,5 @@ html{scrollbar-width:none}html::-webkit-scrollbar{display:none}.sheet-scroll{scr
 @media(prefers-reduced-motion:reduce){.reveal-card,#copy-pix.copied{animation:none}.pairing-toggle>span:last-child{transition:none}}
 
 .pix-recipient{font-size:12px;color:#5b714e;line-height:1.5;margin:0 0 13px;overflow-wrap:anywhere}.pix-recipient:empty{display:none}
+
+.checkout-actions{flex-direction:column;align-items:stretch}.checkout-submit-status{margin:0;font-size:12px;line-height:1.4;color:#9f3939;overflow-wrap:anywhere}

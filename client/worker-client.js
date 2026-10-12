@@ -19,27 +19,42 @@ const ready = new Promise((resolve, reject) => { resolveReady = resolve; rejectR
 ready.catch(() => {});
 const stop = () => { listeners.forEach(fn => fn()); listeners = []; };
 const call = async (name, data) => {
-  await ready;
-  const user = auth.currentUser;
-  if (!user) throw new Error('Entre na sua conta para continuar.');
-  const headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + await user.getIdToken()};
-  if (appCheck) headers['X-Firebase-AppCheck'] = (await getToken(appCheck)).token;
   const controller = new AbortController();
-  const timeout = name === 'createOrder' ? setTimeout(() => controller.abort(), 30000) : null;
-  let response;
+  const unavailable = message => Object.assign(new Error(message), {code:'unavailable', publicMessage:message});
+  const expired = () => unavailable('O pedido demorou a responder. Tente novamente.');
+  const checkPending = () => { if (controller.signal.aborted) throw expired(); };
+  const request = async () => {
+    await ready; checkPending();
+    const user = auth.currentUser;
+    if (!user) throw Object.assign(new Error('Entre na sua conta para continuar.'), {publicMessage:'Entre na sua conta para continuar.'});
+    const identityToken = await user.getIdToken(); checkPending();
+    const headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + identityToken};
+    if (appCheck) {
+      try { headers['X-Firebase-AppCheck'] = (await getToken(appCheck)).token; }
+      catch { throw unavailable('Não foi possível verificar esta sessão. Atualize a página e tente novamente.'); }
+      checkPending();
+    }
+    let response;
+    try {
+      response = await fetch(config.workerApiUrl.replace(/\/$/, '') + '/api/' + name, {
+        method: 'POST', headers, body: JSON.stringify(data), cache: 'no-store', signal: controller.signal
+      });
+    } catch { throw controller.signal.aborted ? expired() : unavailable('Confira sua conexão e tente novamente.'); }
+    checkPending();
+    let result;
+    try { result = await response.json(); } catch { throw unavailable('Servidor indisponível. Tente novamente.'); }
+    checkPending();
+    if (!response.ok) { const message = typeof result?.error === 'string' ? result.error : 'Não foi possível concluir.'; const error = new Error(message); error.code = result?.code || 'unavailable'; error.publicMessage = message; throw error; }
+    return result;
+  };
+  let timeout;
   try {
-    response = await fetch(config.workerApiUrl.replace(/\/$/, '') + '/api/' + name, {
-      method: 'POST', headers, body: JSON.stringify(data), cache: 'no-store', signal: controller.signal
+    if (name !== 'createOrder') return await request();
+    const deadline = new Promise((_,reject) => {
+      timeout = setTimeout(() => { controller.abort(); reject(expired()); },30000);
     });
-  } catch {
-    const error = new Error(controller.signal.aborted ? 'O pedido demorou a responder. Tente novamente.' : 'Confira sua conexão e tente novamente.');
-    error.code = 'unavailable'; error.publicMessage = error.message;
-    throw error;
-  } finally { if (timeout !== null) clearTimeout(timeout); }
-  let result;
-  try { result = await response.json(); } catch { throw new Error('Servidor indisponível. Tente novamente.'); }
-  if (!response.ok) { const message = typeof result?.error === 'string' ? result.error : 'Não foi possível concluir.'; const error = new Error(message); error.code = result?.code || 'unavailable'; error.publicMessage = message; throw error; }
-  return result;
+    return await Promise.race([request(),deadline]);
+  } finally { if (timeout !== undefined) clearTimeout(timeout); }
 };
 window.TropiCloud = {
   enabled: true, ready,

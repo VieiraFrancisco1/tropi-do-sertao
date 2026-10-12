@@ -29,7 +29,8 @@ if(LIVE){
   const code=String(error?.code||'').replace(/^firestore\//,'');
   const friendly={'permission-denied':'Não foi possível acessar seus pedidos. Entre novamente.','unavailable':'Confira sua conexão e tente novamente.','failed-precondition':'Não foi possível atualizar seus pedidos agora. Tente novamente.'};
   const publicMessage=typeof error?.publicMessage==='string'?error.publicMessage.slice(0,240):'';
-  toast(messages[error?.code]||publicMessage||friendly[code]||'Não foi possível concluir. Tente novamente.');
+  const message=messages[error?.code]||publicMessage||friendly[code]||'Não foi possível concluir. Tente novamente.';
+  toast(message);return message;
  }
  function refreshVisible(){
   if($('account-dialog').open)renderAccount();
@@ -108,7 +109,8 @@ if(LIVE){
   const data={name:String(values.get('customer')||'').trim(),phone:String(values.get('phone')||''),payment,cardType:selected?.dataset.cardType||'',change,
    delivery:values.get('delivery')==='entrega'?'Entrega':'Retirada',neighborhood:String(values.get('neighborhood')||''),address:values.get('delivery')==='entrega'?checkoutAddress(values):'',reference:String(values.get('reference')||''),
    whatsappOptIn:false,lines:cart.map(l=>({...l,extras:[...l.extras]}))};
-  const button=e.currentTarget.querySelector('[type="submit"]'),buttonContent=button.innerHTML;submitting=true;button.disabled=true;
+  const button=e.currentTarget.querySelector('[type="submit"]'),buttonContent=button.innerHTML,status=$('checkout-submit-status');submitting=true;button.disabled=true;
+  status.hidden=true;status.textContent='';
   button.innerHTML=svg('clock')+' Preparando seu pedido...';button.setAttribute('aria-busy','true');
   try{
    const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(data)));
@@ -117,15 +119,15 @@ if(LIVE){
    if(pending?.fingerprint!==fingerprint)pending={fingerprint,key:uid()};
    save('tropisertao-live-checkout-key',pending);
    const result=await CLOUD.createOrder({...data,requestKey:pending.key}),order=result.order;
-   if(order.customer.id!==cloudSession?.uid){toast('Pedido registrado na conta anterior. Entre nela para acompanhar.');return;}
+   if(order.customer.id!==cloudSession?.uid){status.textContent='Pedido registrado na conta anterior. Entre nela para acompanhar.';status.hidden=false;toast(status.textContent);return;}
    const whatsappUrl=whatsappOrderUrl(order);
    cloudLoyalty=result.loyalty;profile={id:order.customer.id,name:order.customer.name,phone:order.customer.phone};
-   orders=[order,...orders.filter(o=>o.id!==order.id)];cart=[];updateCart();
-   localStorage.removeItem('tropisertao-live-checkout-key');$('checkout-form').reset();deliveryFields();paymentFields();
-   $('success-receipt').innerHTML=`<span>${esc(order.id)}</span><strong>${money(order.payableTotal??order.total)}</strong>`;
-   $('success-loyalty').innerHTML=loyaltyMarkup(!order.reward);
+   orders=[order,...orders.filter(o=>o.id!==order.id)];
    finishWhatsAppHandoff(order,whatsappUrl);
-  }catch(error){cloudError(error);}finally{submitting=false;button.innerHTML=buttonContent;button.removeAttribute('aria-busy');button.disabled=!$('checkout-form').elements.payment.value;}
+   cart=[];updateCart();
+   localStorage.removeItem('tropisertao-live-checkout-key');$('checkout-form').reset();deliveryFields();paymentFields();
+   $('success-loyalty').innerHTML=loyaltyMarkup(!order.reward);
+  }catch(error){status.textContent=cloudError(error);status.hidden=false;}finally{submitting=false;button.innerHTML=buttonContent;button.removeAttribute('aria-busy');button.disabled=!$('checkout-form').elements.payment.value;}
  };
  cashFormSubmit=async function(e){
   const form=e.target;if(!['cash-open-form','cash-movement-form','cash-close-form'].includes(form.id))return;
@@ -165,13 +167,14 @@ if(LIVE){
   }catch(error){cloudError(error);}finally{buttons.forEach(b=>b.disabled=false);}
  });
  const checkoutButton=$('checkout-form').querySelector('[type="submit"]');
- checkoutButton.innerHTML=svg('whatsapp')+' Enviar pedido para WhatsApp';
+ checkoutButton.innerHTML=svg('check')+' Confirmar pedido';
  $('customer-phone').required=true;
  CLOUD.start({
   onSession(session){
    if(cloudSession?.uid!==session?.uid||cloudSession?.owner!==session?.owner){
     for(const id of ['admin-dialog','report-dialog','cash-dialog','detail-dialog','print-dialog','success-dialog','club-dialog','orders-dialog'])if($(id).open)$(id).close();
     for(const id of ['admin-content','report-content','cash-content','detail-content','detail-actions','print-preview','print-area','success-receipt','success-loyalty','orders-content','club-content'])$(id).innerHTML='';
+    $('success-whatsapp-footer').hidden=true;$('success-whatsapp').removeAttribute('href');
     detailOwner=false;
    }
    cloudSession=session;connection=null;reports.clear();reportRequest++;
