@@ -18,7 +18,7 @@ function whatsappOrderUrl(order){
   'Telefone: '+order.customer.phone,
   '',
   '*Itens do pedido:*',
-  ...order.lines.map(item=>'- '+item.label+' — '+money(item.subtotal)+(item.notes?'\\n  Observação: '+item.notes:'')),
+  ...order.lines.map(item=>'- '+item.label+' — '+money(item.subtotal)+(item.notes?'\n  Observação: '+item.notes:'')),
   '',
   '*Total dos produtos: '+money(order.total)+'*',
   'Recebimento: '+order.delivery,
@@ -27,11 +27,12 @@ function whatsappOrderUrl(order){
   ...(order.payment==='Dinheiro'&&order.change?['Troco para: '+money(order.change)]:[]),
   'Taxa de entrega e pagamento a confirmar com a loja.'
  ];
- return 'https://wa.me/'+STORE_WHATSAPP_NUMBER+'?text='+encodeURIComponent(details.join('\\n'));
+ return 'https://wa.me/'+STORE_WHATSAPP_NUMBER+'?text='+encodeURIComponent(details.join('\n'));
 }
 function beginWhatsAppHandoff(){
  const tab=window.open('about:blank','_blank');
  if(tab)try{
+  tab.opener=null;
   tab.document.title='Preparando seu pedido - Tropi do Sertão';
   tab.document.body.textContent='Aguarde, preparando sua mensagem para o WhatsApp...';
  }catch{}
