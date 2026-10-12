@@ -38,3 +38,7 @@ O workflow em `.github/workflows/deploy.yml` roda testes e prepara a publicaçã
 O pipeline publica **somente** o Hosting `tropidosertao` e o Worker `tropisertao-api`. Não publica Cloud Functions, regras do Firestore ou índices automaticamente.
 
 **Segurança:** não envie arquivos de conta de serviço, JSONs privados, `config/firebase.local.json`, `dist/` ou `node_modules/` ao GitHub. O projeto Firebase é Spark (sem Blaze); a API roda no Cloudflare Workers.
+
+## Automacao de deploy
+
+O deploy via GitHub Actions é acionado por alterações na branch `main` e depende das variáveis e secrets configurados no próprio GitHub. A etapa de publicação roda apenas após os testes automatizados; verifique o histórico em **Actions**.
