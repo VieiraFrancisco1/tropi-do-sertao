@@ -24,25 +24,54 @@ function renderStoreInfo(){
 
 
 const STORE_WHATSAPP_NUMBER='5588996862960';
+const ORDER_TRACKING_URL='https://tropidosertao.web.app/#pedidos';
+function storePix(){
+ const key=String(window.TropiConfig?.pixKey||R.STORE.pix.key).trim();
+ const same=key.replace(/\D/g,'')===R.STORE.pix.key;
+ return {key:same?R.STORE.pix.key:key,display:same?R.STORE.pix.display:key,holder:same?R.STORE.pix.holder:'',type:same?R.STORE.pix.type:''};
+}
 function whatsappOrderUrl(order){
+ const delivery=order.delivery==='Entrega',pix=storePix();
+ const separator='------------------------------';
+ const orderedAt=Number.isFinite(order.date)?new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeStyle:'medium',timeZone:'America/Fortaleza'}).format(order.date).replace(',',''):'';
+ const items=order.lines.flatMap(item=>{
+  const p=R.product(item.productId),qty=item.qty||1;
+  const label=p?R.lineTitle(item):String(item.label||'Item').replace(/^\d+\s*[×x]\s*/i,'');
+  const result=['*'+qty+'x '+label+' '+money(item.subtotal)+'*'];
+  if(item.reward)result.push('## Presente do Clube Tropi');
+  for(const id of item.extras||[]){const extra=R.extra(id);if(extra)result.push('## '+extra.name+' x'+qty);}
+  if(p?.kind==='combo'){
+   result.push('## Sanduíche natural x'+qty,'## Salada de frutas 145 ml x'+qty);
+   const juice=R.product(item.comboJuiceId);if(juice)result.push('## '+juice.name+' · '+juice.size+' x'+qty);
+  }
+  if(item.notes)result.push('Observação: '+item.notes);
+  return [...result,''];
+ });
+ const count=order.lines.reduce((sum,item)=>sum+(item.qty||1),0);
  const details=[
-  '*PEDIDO - TROPI DO SERTÃO*',
-  'Número: '+order.id,
-  'Cliente: '+order.customer.name,
-  'Telefone: '+order.customer.phone,
+  '*PEDIDO TROPI DO SERTÃO*',
+  '*Link para acompanhar o status:* '+ORDER_TRACKING_URL,
   '',
-  '*Itens do pedido:*',
-  ...order.lines.map(item=>'- '+item.label+' — '+money(item.subtotal)+(item.notes?'\n  Observação: '+item.notes:'')),
+  '*Pedido:* '+order.id+(orderedAt?' ('+orderedAt+')':''),
+  '*Tipo:* '+order.delivery,
+  '*Status:* '+(R.STATUS_LABELS[order.status]||'Recebido'),
+  '*Estimativa:* '+(delivery?R.STORE.deliveryTime:R.STORE.pickupTime),
+  separator,
+  '*NOME:* '+order.customer.name,
+  '*Fone:* '+order.customer.phone,
+  ...(delivery?['*Endereço:* '+order.address,'*Bairro:* '+order.neighborhood,...(order.reference?['*Complemento:* '+order.reference]:[])]:['*Endereço de retirada:* '+R.STORE.address]),
+  separator,
+  ...items,
+  separator,
+  '*Itens ('+count+'):* '+money(order.total),
+  '*Desconto:* '+money(order.discount||0),
+  ...(delivery?['*Entrega:* '+money(order.deliveryFee||0)]:[]),
   '',
-  'Produtos: '+money(order.total),
-  ...(order.delivery==='Entrega'?['Taxa de entrega: '+money(order.deliveryFee||0)]:[]),
-  '*Total: '+money(order.payableTotal??order.total)+'*',
-  'Recebimento: '+order.delivery,
-  ...(order.delivery==='Entrega'?['Bairro: '+order.neighborhood]:[]),
-  ...(order.delivery==='Entrega'?['Endereço: '+order.address,...(order.reference?['Referência: '+order.reference]:[])]:[]),
-  'Pagamento: '+order.payment+(order.cardType?' ('+order.cardType+')':''),
-  ...(order.payment==='Dinheiro'&&order.change?['Troco para: '+money(order.change)]:[]),
-  'Taxa de entrega e pagamento a confirmar com a loja.'
+  '*TOTAL:* '+money(order.payableTotal??order.total),
+  separator,
+  '*Pagamento:* '+order.payment+(order.cardType?' ('+order.cardType+')':''),
+  ...(order.payment==='Pix'?['*Chave Pix'+(pix.type?' ('+pix.type+')':'')+':* '+pix.display,...(pix.holder?['*Recebedor:* '+pix.holder]:[])]:[]),
+  ...(order.payment==='Dinheiro'?['*Precisa de troco:* '+(order.change?'Sim':'Não'),...(order.change?['*Troco para:* '+money(order.change)]:[])]:[])
  ];
  return 'https://wa.me/'+STORE_WHATSAPP_NUMBER+'?text='+encodeURIComponent(details.join('\n'));
 }
@@ -133,12 +162,13 @@ const loyalty=()=>LIVE&&cloudLoyalty?cloudLoyalty:R.loyaltyState(orders,profile.
 const total=()=>R.cartTotal(cart);
 function toast(text){$('toast').textContent=text;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),3000);}
 function showDialog(id){
+  if(id!=='orders-dialog'&&location.hash==='#pedidos')history.replaceState(null,'',location.pathname+location.search);
   if(!document.querySelector('dialog[open]'))lastFocus=document.activeElement;
   document.querySelectorAll('dialog[open]').forEach(d=>d.close());
   document.body.style.overflow='hidden';$(id).showModal();
   $(id).querySelector('.sheet-scroll')?.scrollTo(0,0);
 }
-function closeDialog(d){d.close();if(!document.querySelector('dialog[open]')){document.body.style.overflow='';if(lastFocus?.isConnected)lastFocus.focus({preventScroll:true});}}
+function closeDialog(d){d.close();if(d.id==='orders-dialog'&&location.hash==='#pedidos')history.replaceState(null,'',location.pathname+location.search);if(!document.querySelector('dialog[open]')){document.body.style.overflow='';if(lastFocus?.isConnected)lastFocus.focus({preventScroll:true});}}
 function choose(){document.querySelectorAll('dialog[open]').forEach(closeDialog);category='tudo';$('search').value='';renderMenu();$('cardapio').scrollIntoView({behavior:motion.matches?'auto':'smooth'});}
 function renderMenu(){
  const q=normal($('search').value.trim()),matches=s=>normal(s).includes(q);
@@ -231,7 +261,7 @@ function orderCard(o,owner=false){
 function renderOrders(){
  const own=orders.filter(o=>o.customer.id===profile.id);
  const s=loyalty();
- $('orders-content').innerHTML=`<div class="mini-loyalty"><span>Seu cartão já tem <strong>${s.qualifying} ${s.qualifying===1?'pedido':'pedidos'}</strong></span><button data-action="club">Ver cartão</button></div>`+(own.length?own.map(o=>orderCard(o)).join(''):`<div class="empty-state"><span class="empty-icon">${svg('receipt')}</span><h3>Sua primeira combinação.</h3><p>Ao finalizar, seu pedido aparece aqui e no cartão fidelidade.</p><button class="primary" data-action="choose">Escolher minha salada</button></div>`);
+ $('orders-content').innerHTML=`<div class="mini-loyalty"><span>Seu cartão já tem <strong>${s.qualifying} ${s.qualifying===1?'pedido':'pedidos'}</strong></span><button data-action="club">Ver cartão</button></div>`+(own.length?own.map(o=>orderCard(o)).join(''):`<div class="empty-state"><span class="empty-icon">${svg('receipt')}</span><h3>Sua primeira combinação.</h3><p>Ao finalizar, seu pedido aparece aqui e no cartão fidelidade.</p>${LIVE&&cloudSession?.anonymous?'<p>Entre na sua conta para consultar pedidos de outro dispositivo.</p><button class="secondary full" data-action="account">Entrar na minha conta</button>':''}<button class="primary" data-action="choose">Escolher minha salada</button></div>`);
 }
 function renderAdmin(){
  const active=orders.filter(o=>o.status!=='cancelado'),q=normal($('admin-search').value);
@@ -427,8 +457,9 @@ function paymentFields(event){
  const change=cash&&$('checkout-form').elements.needsChange.value==='sim';
  $('change-fields').hidden=!change;$('customer-change').disabled=!change;$('customer-change').required=change;
  if(!change){$('customer-change').value='';$('customer-change').setCustomValidity('');}
- const key=String(window.TropiConfig?.pixKey||'').trim();
- $('pix-key').textContent=key||'Chave Pix a confirmar com a loja.';$('copy-pix').disabled=!key;
+ const pixInfo=storePix();
+ $('pix-key').textContent=pixInfo.display;$('copy-pix').disabled=!pixInfo.key;
+ $('pix-recipient').textContent=pixInfo.holder?'Recebedor: '+pixInfo.holder:'';
  $('send-order').disabled=!payment;
  if(event?.target?.name==='payment')scrollToInfo($(pix?'pix-card':cash?'cash-card':'checkout-summary'));
  if(event?.target?.name==='needsChange'&&change)scrollToInfo($('change-fields'));
@@ -444,7 +475,7 @@ function validateCheckoutPayment(){
  return true;
 }
 async function copyPix(){
- const key=String(window.TropiConfig?.pixKey||'').trim();if(!key)return;
+ const key=storePix().key;if(!key)return;
  try{
   if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(key);
   else{const field=document.createElement('textarea');field.value=key;field.style.position='fixed';field.style.opacity='0';document.body.append(field);field.select();const copied=document.execCommand('copy');field.remove();if(!copied)throw new Error('copy');}
@@ -566,5 +597,12 @@ function updateFruitScrollbar(){
 let scrollFrame=0;const queueScrollIndicator=()=>{if(scrollFrame)return;scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;updateFruitScrollbar();});};
 document.addEventListener('scroll',queueScrollIndicator,{passive:true,capture:true});window.addEventListener('resize',queueScrollIndicator);
 new ResizeObserver(queueScrollIndicator).observe(document.body);new MutationObserver(queueScrollIndicator).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','open']});
-paint();renderMenu();updateCart();updatePause();renderStoreInfo();queueScrollIndicator();
+async function openTrackedOrders(){
+ if(location.hash!=='#pedidos')return;
+ if(LIVE){try{await CLOUD.ready;}catch{return;}}
+ if(location.hash!=='#pedidos')return;
+ renderOrders();showDialog('orders-dialog');
+}
+window.addEventListener('hashchange',openTrackedOrders);
+paint();renderMenu();updateCart();updatePause();renderStoreInfo();queueScrollIndicator();openTrackedOrders();
 })();

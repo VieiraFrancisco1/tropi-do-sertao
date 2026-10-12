@@ -1,10 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import '../logic.js';
 
 const key = process.env.TROPI_APP_CHECK_SITE_KEY?.trim();
 if (!key) throw new Error('Falta TROPI_APP_CHECK_SITE_KEY (chave publica).');
 const config = {
   mode: 'worker',
-  pixKey: process.env.TROPI_PIX_KEY?.trim() || '',
+  pixKey: process.env.TROPI_PIX_KEY?.trim() || globalThis.TropiRules.STORE.pix.key,
   firebase: {
     apiKey: 'AIzaSyCTxKI6ke0lUWmb2XxuvHaw_nUFk0mjFRk',
     authDomain: 'tropisertao-854d3.firebaseapp.com',
