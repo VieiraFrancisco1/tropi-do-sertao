@@ -42,7 +42,7 @@ function configure(env, dependency={}) {
       return json({...health,whatsappEnabled:enabled},health.status==='ok'?200:503,headers);
     }
     if(path==='/api/whatsapp/webhook'){
-      if(req.method==='GET')return req.headers.get('hub.mode')==='subscribe' && env.WHATSAPP_VERIFY_TOKEN && url.searchParams.get('hub.verify_token')===env.WHATSAPP_VERIFY_TOKEN?new Response(url.searchParams.get('hub.challenge')||'',{status:200}):new Response('Forbidden',{status:403});
+      if(req.method==='GET')return url.searchParams.get('hub.mode')==='subscribe' && env.WHATSAPP_VERIFY_TOKEN && url.searchParams.get('hub.verify_token')===env.WHATSAPP_VERIFY_TOKEN?new Response(url.searchParams.get('hub.challenge')||'',{status:200}):new Response('Forbidden',{status:403});
       if(req.method!=='POST')return new Response('Method Not Allowed',{status:405});
       if(!env.WHATSAPP_APP_SECRET)return new Response('Webhook not configured',{status:503});
       const bytes=await req.arrayBuffer();if(bytes.byteLength>128000)return new Response('Payload too large',{status:413});
