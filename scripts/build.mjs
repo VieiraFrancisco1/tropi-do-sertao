@@ -41,6 +41,7 @@ for (const filename of await readdir(path.join(root,'assets'))) {
 // Nao altera fotos da logo nem o layout dos produtos.
 let uploadedPhotoCount=0;
 const externalPhotos=new Map();
+
 try {
   const photoZip=await readFile(path.join(root,'assets','fotos-tropi-2026.zip'));
   const replacements=unpackTropiPhotos(photoZip);

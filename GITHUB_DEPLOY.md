@@ -13,6 +13,7 @@ O workflow testa o projeto em cada alteração na branch `main`. O deploy fica i
 
 **Repository variables:**
 - `TROPI_APP_CHECK_SITE_KEY` — chave pública do reCAPTCHA Enterprise já registrado.
+- `TROPI_PIX_KEY` — chave Pix real da loja, exibida no checkout. Sem essa variável o botão de copiar fica desativado.
 - `TROPI_DEPLOY_READY` — manter `false` até que os testes, a configuração e as permissões do ambiente de produção estejam confirmados; mudar para `true` para ativar deploys de `main`.
 
 ## Segurança

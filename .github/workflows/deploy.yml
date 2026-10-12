@@ -47,6 +47,7 @@ jobs:
       - name: Gerar configuracao publica de producao
         env:
           TROPI_APP_CHECK_SITE_KEY: ${{ vars.TROPI_APP_CHECK_SITE_KEY }}
+          TROPI_PIX_KEY: ${{ vars.TROPI_PIX_KEY }}
         run: node scripts/create-github-config.mjs
       - run: npm run preflight
       - run: npm run build:worker

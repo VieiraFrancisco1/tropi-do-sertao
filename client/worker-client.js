@@ -1,3 +1,4 @@
+import { listenOrders } from './order-listener.mjs';
 import { phoneLoginAlias } from './phone-login.js';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, EmailAuthProvider, linkWithCredential, signOut, connectAuthEmulator } from 'firebase/auth';
@@ -47,11 +48,8 @@ window.TropiCloud = {
         if (version !== sessionVersion) return;
         const owner = result.claims.tropiAdmin === true;
         hooks.onSession({ uid: user.uid, owner, anonymous: user.isAnonymous });
-        const ordersQuery = owner
-          ? query(collection(db, 'orders'), orderBy('date', 'desc'), limit(1000))
-          : query(collection(db, 'orders'), where('customer.id', '==', user.uid), orderBy('date', 'desc'), limit(200));
         const current = fn => value => { if (version === sessionVersion) fn(value); };
-        listeners.push(onSnapshot(ordersQuery, current(snapshot => hooks.onOrders(snapshot.docs.map(d => d.data()))), current(hooks.onError)));
+        listeners.push(listenOrders({ db, userId: user.uid, owner, api: { collection, query, where, orderBy, limit, onSnapshot }, onOrders: current(hooks.onOrders), onError: current(hooks.onError) }));
         listeners.push(onSnapshot(doc(db, 'customers', user.uid), current(snapshot => hooks.onProfile(snapshot.data() || null)), current(hooks.onError)));
         if (owner) listeners.push(onSnapshot(query(collection(db, 'cashSessions'), orderBy('openedAt', 'desc'), limit(100)), current(snapshot => hooks.onCash(snapshot.docs.map(d => d.data()))), current(hooks.onError)));
         resolveReady();
