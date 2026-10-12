@@ -17,10 +17,9 @@ test('cria link da loja com mensagem completa, pedido e entrega', () => {
  const message = url.searchParams.get('text');
  assert.equal(url.origin,'https://wa.me');
  assert.equal(url.pathname,'/5588996862960');
- for(const phrase of ['TROPI-123','Maria','5588999999999','Salada + ninho','Sem banana','Rua A, 10','Casa azul','Dinheiro','R$\\u00a024,00','R$\\u00a030,00'])assert.ok(message.includes(phrase), phrase);
- assert.ok(message.includes('\\nItens do pedido:') === false);
- assert.ok(message.includes('\\n*Itens do pedido:*'));
- assert.equal(message.includes('\\\\n'), false, 'Não usar barra + n literal em vez de quebra de linha');
+ for(const phrase of ['TROPI-123','Maria','5588999999999','Salada + ninho','Sem banana','Rua A, 10','Casa azul','Dinheiro',money(2400),money(3000)])assert.ok(message.includes(phrase), phrase);
+ assert.ok(message.includes(String.fromCharCode(10)+'*Itens do pedido:*'));
+ assert.equal(message.includes(String.fromCharCode(92)+'n'), false, 'Não usar barra + n literal em vez de quebra de linha');
 });
 
 test('retirada não inclui endereço nem troco', () => {
