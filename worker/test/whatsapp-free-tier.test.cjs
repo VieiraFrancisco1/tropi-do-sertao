@@ -102,3 +102,17 @@ test('invalid webhook signature does not register an inbound service window', as
   assert.equal((await s.api.webhook({ rawBody: Buffer.from('{}'), signature: 'sha256=' + '0'.repeat(64), body })).status, 401);
   assert.equal([...s.db.store.keys()].some(key => key.startsWith('whatsappRecipients/')), false);
 });
+
+test('Meta webhook GET challenge is read from query parameters (not headers)', async () => {
+  const { configure } = require('../app.cjs');
+  const api = configure({
+    FIREBASE_PROJECT_ID: 'demo-tropisertao', ALLOWED_ORIGINS: 'https://tropi.web.app',
+    WHATSAPP_VERIFY_TOKEN: 'test-verification-secret'
+  }, { db: memoryDb(), authorize: async () => ({ uid: 'u' }), checkApp: async () => true });
+  const url = 'https://api.example/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=test-verification-secret&hub.challenge=challenge-123';
+  const okay = await api.handle(new Request(url));
+  assert.equal(okay.status, 200);
+  assert.equal(await okay.text(), 'challenge-123');
+  const blocked = await api.handle(new Request(url.replace('test-verification-secret', 'incorrect')));
+  assert.equal(blocked.status, 403);
+});
