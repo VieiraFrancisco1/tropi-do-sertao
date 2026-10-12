@@ -56,10 +56,11 @@ function createWhatsApp({ db, config, fetchImpl = fetch, clock = Date.now }) {
       const snap = await tx.get(ref); if (!snap.exists) return null;
       const current = snap.data();
       if (!['pending', 'retry'].includes(current.state) || current.nextAttemptAt > at) return null;
+      const orderRef = db.doc('orders/' + current.orderId);
       const quotaRef = db.doc('whatsappMonthlyQuota/' + monthKey(at, cfg.billingTimeZone));
       const [recipient, order, quota] = await Promise.all([
         tx.get(db.doc('whatsappRecipients/' + digest(current.phone))),
-        tx.get(db.doc('orders/' + current.orderId)),
+        tx.get(orderRef),
         tx.get(quotaRef)
       ]);
       const o = order.data();
@@ -74,7 +75,7 @@ function createWhatsApp({ db, config, fetchImpl = fetch, clock = Date.now }) {
         // pode atualizar o status antes de a Meta entregar esse webhook.
         if (at - current.createdAt < 10 * 60 * 1000) {
           tx.update(ref, { state: 'retry', nextAttemptAt: at + 120000, updatedAt: at });
-          if (order.exists) tx.update(order.ref, {
+          if (order.exists) tx.update(orderRef, {
             ['notifications.' + current.status]: { state: 'waiting-for-customer', at, jobId: id }
           });
           return null;
@@ -85,7 +86,7 @@ function createWhatsApp({ db, config, fetchImpl = fetch, clock = Date.now }) {
       if (!skipped && reserved >= (cfg.monthlyCap || 1000)) skipped = 'quota-reached';
       if (skipped) {
         tx.update(ref, { state: skipped, updatedAt: at });
-        if (order.exists) tx.update(order.ref, { ['notifications.' + current.status]: { state: skipped, at, jobId: id } });
+        if (order.exists) tx.update(orderRef, { ['notifications.' + current.status]: { state: skipped, at, jobId: id } });
         return null;
       }
       const attempts = current.attempts + 1;
