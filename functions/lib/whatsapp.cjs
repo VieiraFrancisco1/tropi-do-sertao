@@ -1,5 +1,30 @@
 'use strict';
-const { digest, phone, verifySignature, templatePayload, deliveryProgress } = require('./domain.cjs');
+const { digest, phone, verifySignature, deliveryProgress } = require('./domain.cjs');
+// Desde outubro/2026, a franquia de 1.000 cobre apenas mensagens de SERVIÇO
+// (texto livre enviado até 24h após uma mensagem do cliente). Templates utility
+// não fazem parte da franquia. Este emissor nunca envia templates pagos.
+const SAFE_SERVICE_WINDOW_MS = 23 * 60 * 60 * 1000 + 45 * 60 * 1000;
+function monthKey(at, timeZone = 'America/Fortaleza') {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, year: 'numeric', month: '2-digit'
+  }).formatToParts(new Date(at));
+  const field = type => parts.find(part => part.type === type)?.value;
+  return field('year') + field('month');
+}
+function servicePayload(job) {
+  const name = String(job.customerName || 'Cliente').trim().split(/\s+/)[0].slice(0, 60) || 'Cliente';
+  const content = job.status === 'preparando'
+    ? 'Seu pedido ' + job.orderId + ' foi aceito e entrou em preparação.'
+    : job.status === 'entrega'
+      ? 'Seu pedido ' + job.orderId + ' saiu para entrega!'
+      : null;
+  if (!content) throw new Error('Invalid order status for WhatsApp');
+  return {
+    messaging_product: 'whatsapp', recipient_type: 'individual',
+    to: phone(job.phone), type: 'text', biz_opaque_callback_data: job.id,
+    text: { preview_url: false, body: 'Olá, ' + name + '! ' + content + ' Acompanhe pelo site da Tropi do Sertão. Para não receber mais avisos, responda SAIR.' }
+  };
+}
 function createWhatsApp({ db, config, fetchImpl = fetch, clock = Date.now }) {
   const jobRef = id => db.doc('messageJobs/' + id);
   const safeId = id => typeof id === 'string' && /^TROPI-\d{3,12}__(preparando|entrega)$/.test(id);
@@ -31,28 +56,50 @@ function createWhatsApp({ db, config, fetchImpl = fetch, clock = Date.now }) {
       const snap = await tx.get(ref); if (!snap.exists) return null;
       const current = snap.data();
       if (!['pending', 'retry'].includes(current.state) || current.nextAttemptAt > at) return null;
-      const [recipient, order] = await Promise.all([
+      const quotaRef = db.doc('whatsappMonthlyQuota/' + monthKey(at, cfg.billingTimeZone));
+      const [recipient, order, quota] = await Promise.all([
         tx.get(db.doc('whatsappRecipients/' + digest(current.phone))),
-        tx.get(db.doc('orders/' + current.orderId))
+        tx.get(db.doc('orders/' + current.orderId)),
+        tx.get(quotaRef)
       ]);
       const o = order.data();
       let skipped = '';
       if (!o?.whatsappConsent?.granted || recipient.data()?.optedOut) skipped = 'no-consent';
       else if (o.status !== current.status) skipped = 'superseded';
       else if (current.attempts >= 5) skipped = 'failed';
+      const inboundAt = Number(recipient.data()?.lastInboundAt || 0);
+      const openWindow = inboundAt > 0 && at >= inboundAt && at - inboundAt < SAFE_SERVICE_WINDOW_MS;
+      if (!skipped && !openWindow) {
+        // Aguarda o webhook da mensagem do pedido por alguns minutos. A loja
+        // pode atualizar o status antes de a Meta entregar esse webhook.
+        if (at - current.createdAt < 10 * 60 * 1000) {
+          tx.update(ref, { state: 'retry', nextAttemptAt: at + 120000, updatedAt: at });
+          if (order.exists) tx.update(order.ref, {
+            ['notifications.' + current.status]: { state: 'waiting-for-customer', at, jobId: id }
+          });
+          return null;
+        }
+        skipped = 'outside-window';
+      }
+      const reserved = Math.max(0, Number(quota.data()?.reserved || 0));
+      if (!skipped && reserved >= (cfg.monthlyCap || 1000)) skipped = 'quota-reached';
       if (skipped) {
         tx.update(ref, { state: skipped, updatedAt: at });
         if (order.exists) tx.update(order.ref, { ['notifications.' + current.status]: { state: skipped, at, jobId: id } });
         return null;
       }
       const attempts = current.attempts + 1;
+      // Reserva uma vaga de forma transacional ANTES de chamar a Meta.
+      // Reservas contam tentativas, mesmo se forem rejeitadas: conservador
+      // para evitar ultrapassar o limite gratuito em falhas/reenvios.
+      tx.set(quotaRef, { reserved: reserved + 1, phoneNumberId: cfg.phoneNumberId, updatedAt: at }, { merge: true });
       tx.update(ref, { state: 'sending', attempts, leaseUntil: at + 90000, updatedAt: at });
       return { ...current, attempts };
     });
     if (!job) return;
     let payload;
-    try { payload = templatePayload(job, cfg); }
-    catch { await finish(id, { state: 'blocked', errorCode: 'template-not-configured' }); return; }
+    try { payload = servicePayload(job); }
+    catch { await finish(id, { state: 'blocked', errorCode: 'invalid-service-message' }); return; }
     let response, body;
     try {
       response = await fetchImpl('https://graph.facebook.com/' + cfg.version + '/' + cfg.phoneNumberId + '/messages', {
@@ -114,10 +161,22 @@ function createWhatsApp({ db, config, fetchImpl = fetch, clock = Date.now }) {
           });
         }
         for (const message of value?.messages || []) {
-          if (message.type !== 'text' || !/^\s*(SAIR|PARAR|STOP)\s*$/i.test(message.text?.body || '')) continue;
           let number; try { number = phone(message.from); } catch { continue; }
-          // Only an explicit stop keyword is stored, never incoming message text.
-          await db.doc('whatsappRecipients/' + digest(number)).set({ phone: number, optedOut: true, optedOutAt: clock(), source: 'whatsapp-keyword' }, { merge: true });
+          const at = clock();
+          const inboundAt = Number(message.timestamp) * 1000;
+          // A assinatura do webhook foi validada; aceitamos o horário da Meta,
+          // mas não estendemos a janela com webhooks antigos/repetidos.
+          if (!Number.isFinite(inboundAt) || inboundAt > at + 60000 || inboundAt < at - 2 * 86400000) continue;
+          const stop = message.type === 'text' && /^\s*(SAIR|PARAR|STOP)\s*$/i.test(message.text?.body || '');
+          const recipientRef = db.doc('whatsappRecipients/' + digest(number));
+          await db.runTransaction(async tx => {
+            const previous = await tx.get(recipientRef);
+            const lastInboundAt = Math.max(Number(previous.data()?.lastInboundAt || 0), Math.min(at, inboundAt));
+            tx.set(recipientRef, {
+              phone: number, lastInboundAt,
+              ...(stop ? { optedOut: true, optedOutAt: at, source: 'whatsapp-keyword' } : {})
+            }, { merge: true });
+          });
         }
       }
     }
