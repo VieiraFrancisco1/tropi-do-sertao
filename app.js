@@ -377,6 +377,7 @@ function deliveryFields(){
  $('checkout-delivery-fee').textContent=fee===null?'Selecione um bairro':money(fee);
  $('checkout-delivery-row').hidden=!delivery;
  $('checkout-grand-total').textContent=fee===null?'—':money(total()+fee);
+ $('checkout-grand-label').textContent=delivery?'Total com entrega':'Total do pedido';
 }
 function paymentFields(){const cash=$('checkout-form').elements.payment.value==='Dinheiro';$('change-fields').hidden=!cash;if(!cash){$('customer-change').value='';$('customer-change').setCustomValidity('');}}
 // CLOUD_BRIDGE
