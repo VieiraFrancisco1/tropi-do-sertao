@@ -4,7 +4,7 @@ const {verifyFirebaseToken,verifyAppCheck}=require('./auth.cjs');
 const {createService}=require('../functions/lib/service.cjs');
 const {createWhatsApp}=require('../functions/lib/whatsapp.cjs');
 const {requireUser,AppError,digest}=require('../functions/lib/domain.cjs');
-const ROUTES={createOrder:'createOrder',validateCheckout:'validateCheckout',updateOrderStatus:'updateStatus',cashAction:'cashAction',getOrderReport:'report',getStoreConnection:'connection'};
+const ROUTES={createOrder:'createOrder',updateOrderStatus:'updateStatus',cashAction:'cashAction',getOrderReport:'report',getStoreConnection:'connection'};
 const codeToStatus={'invalid-argument':400,unauthenticated:401,'permission-denied':403,'not-found':404,'failed-precondition':409,aborted:409,'resource-exhausted':429};
 const json=(value,status=200,headers={})=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...headers}});
 function configure(env, dependency={}) {
@@ -28,7 +28,7 @@ function configure(env, dependency={}) {
         // changing loyalty, advancing the counter or returning document data.
         await tx.get(db.doc('orderRequests/tropi-health-check'));
         await Promise.all(['controls/orderCounter','customers/tropi-health-check','orderRateLimits/tropi-health-check'].map(path=>tx.get(db.doc(path))));
-      }).then(async()=>({status:'ok',database:'ok',...(db.writeAccess?{writeAccess:await db.writeAccess().catch(()=>'unknown')}:{})})).catch(error=>({status:'unavailable',database:'unavailable',diagnostic:{status:Number.isInteger(error.status)?error.status:500,code:/^[A-Z_]{1,50}$/.test(error.code||'')?error.code:'INTERNAL'}}));
+      }).then(()=>({status:'ok',database:'ok'})).catch(error=>({status:'unavailable',database:'unavailable',diagnostic:{status:Number.isInteger(error.status)?error.status:500,code:/^[A-Z_]{1,50}$/.test(error.code||'')?error.code:'INTERNAL'}}));
     }
     return databaseCheck;
   }

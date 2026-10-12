@@ -42,7 +42,13 @@ test('REST adapter transaction emits precondition for create, merges fields and 
     if(String(url).includes('oauth2.googleapis.com'))return Response.json({access_token:'oauth-test',expires_in:3600});
     if(String(url).endsWith(':beginTransaction'))return Response.json({transaction:'trans123'});
     if(String(url).endsWith('/orders/order-1?transaction=trans123'))return Response.json({error:{status:'NOT_FOUND'}},{status:404});
-    if(String(url).endsWith(':commit'))return Response.json({writeResults:[]});
+    if(String(url).endsWith(':commit')){
+      for(const write of JSON.parse(opts.body).writes){
+        assert.match(write.update.name,/^projects\/demo-tropisertao\/databases\/\(default\)\/documents\/[A-Za-z0-9_/-]+$/);
+        assert.ok(!write.update.name.includes('https://'),'Firestore document names cannot be HTTP URLs');
+      }
+      return Response.json({writeResults:[]});
+    }
     if(String(url).endsWith(':rollback'))return Response.json({});
     throw new Error('Unexpected '+url);
   };
@@ -54,6 +60,7 @@ test('REST adapter transaction emits precondition for create, merges fields and 
   });
   const commit=events.find(x=>x.url.endsWith(':commit'));
   assert.deepEqual(JSON.parse(commit.opts.body).writes[0].currentDocument,{exists:false});
+  assert.equal(JSON.parse(commit.opts.body).writes[0].update.name,'projects/demo-tropisertao/databases/(default)/documents/orders/order-1');
   assert.match(events[0].opts.body,/grant_type/);
 });
 function fakeDb(){
@@ -134,16 +141,4 @@ test('health reports a database failure without leaking credentials or upstream 
   const response=await api.handle(new Request('https://tropi.workers.dev/api/health'));
   assert.equal(response.status,503);
   assert.deepEqual(await response.json(),{status:'unavailable',database:'unavailable',diagnostic:{status:403,code:'PERMISSION_DENIED'},whatsappEnabled:false});
-});
-
-test('checkout validation verifies authenticated customer prices without recording an order',async()=>{
- const db=fakeDb(),api=configure(baseEnv,{db,authorize:async()=>({uid:'shopper1',admin:false}),checkApp:async()=>true});
- const input={requestKey:'quote-request-00001',name:'Cliente Teste',phone:'88999999999',payment:'Pix',delivery:'Entrega',neighborhood:'Alto do Motor',address:'Rua de teste, 1',lines:[{productId:'300',qty:1,extras:[],reward:false}]};
- const result=await api.handle(makeReq('validateCheckout',input));
- assert.equal(result.status,200);
- assert.deepEqual(await result.json(),{total:600,deliveryFee:300,payableTotal:900});
- assert.equal(db.store.size,0);
- const forbidden=await api.handle(makeReq('validateCheckout',input,{authorization:''}));
- assert.equal(forbidden.status,401);
- assert.equal(db.store.size,0);
 });

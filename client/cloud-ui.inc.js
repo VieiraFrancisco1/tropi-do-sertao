@@ -25,7 +25,7 @@ if(LIVE){
   while((node=walk.nextNode())){if(node.parentElement?.closest('script,style'))continue;let value=node.nodeValue;for(const [from,to]of mappings)value=value.split(from).join(to);node.nodeValue=value;}
  }
  function cloudError(error){
-  const messages={'auth/invalid-credential':'Telefone ou senha incorretos.','auth/email-already-in-use':'Este telefone já está cadastrado. Use Entrar.','auth/weak-password':'Use uma senha com pelo menos 6 caracteres.','auth/too-many-requests':'Aguarde alguns minutos e tente novamente.','auth/network-request-failed':'Confira sua conexão e tente novamente.','auth/user-token-expired':'Sua sessão expirou. Atualize a página e entre novamente.','auth/invalid-user-token':'Sua sessão expirou. Atualize a página e entre novamente.'};
+  const messages={'auth/invalid-credential':'Telefone ou senha incorretos.','auth/email-already-in-use':'Este telefone já está cadastrado. Use Entrar.','auth/weak-password':'Use uma senha com pelo menos 6 caracteres.','auth/too-many-requests':'Aguarde alguns minutos e tente novamente.','auth/network-request-failed':'Confira sua conexão e tente novamente.'};
   const code=String(error?.code||'').replace(/^firestore\//,'');
   const friendly={'permission-denied':'Não foi possível acessar seus pedidos. Entre novamente.','unavailable':'Confira sua conexão e tente novamente.','failed-precondition':'Não foi possível atualizar seus pedidos agora. Tente novamente.'};
   const publicMessage=typeof error?.publicMessage==='string'?error.publicMessage.slice(0,240):'';
@@ -99,35 +99,6 @@ if(LIVE){
  const baseOpenCashPrint=openCashPrint;openCashPrint=function(id){baseOpenCashPrint(id);copyLive($('print-preview'));copyLive($('print-area'));};
  const baseRenderClub=renderClub;renderClub=function(){baseRenderClub();$('club-content').querySelector('.help-text').textContent='Seu cartão fidelidade TropiSertão. Cada pedido elegível aproxima você do próximo presente.';};
  const baseStartCheckout=startCheckout;startCheckout=async function(){try{await CLOUD.ready;baseStartCheckout();}catch(e){cloudError(e);}};
- if(typeof CLOUD.validateCheckout==='function'){
-  let checkVersion=0,checkoutReady=false;
-  const baseResetSteps=resetCheckoutSteps,basePaymentFields=paymentFields,baseGoToPayment=goToPayment,baseValidatePayment=validateCheckoutPayment;
-  const paymentButton=$('go-to-payment'),paymentButtonContent=paymentButton.innerHTML;
-  resetCheckoutSteps=function(){checkVersion++;checkoutReady=false;baseResetSteps();paymentButton.disabled=false;paymentButton.innerHTML=paymentButtonContent;};
-  paymentFields=function(event){basePaymentFields(event);if(!checkoutReady)$('send-order').disabled=true;};
-  validateCheckoutPayment=function(){if(!$('payment-step').hidden&&!checkoutReady){toast('Aguarde a conferência do pedido ou toque em Tentar novamente.');return false;}return baseValidatePayment();};
-  goToPayment=async function(){
-   baseGoToPayment();if($('payment-step').hidden)return;
-   const version=++checkVersion,actor=cloudSession?.uid,status=$('checkout-submit-status');
-   checkoutReady=false;paymentFields();status.hidden=true;
-   paymentButton.hidden=false;paymentButton.disabled=true;paymentButton.innerHTML=svg('clock')+' Conferindo seu pedido...';
-   const values=new FormData($('checkout-form'));
-   const input={requestKey:uid(),name:String(values.get('customer')||'').trim(),phone:String(values.get('phone')||''),payment:'Pix',change:0,
-    delivery:values.get('delivery')==='entrega'?'Entrega':'Retirada',neighborhood:String(values.get('neighborhood')||''),address:values.get('delivery')==='entrega'?checkoutAddress(values):'',reference:String(values.get('reference')||''),
-    whatsappOptIn:false,lines:cart.map(line=>({...line,extras:[...line.extras]}))};
-   try{
-    const quote=await CLOUD.validateCheckout(input);
-    if(version!==checkVersion||actor!==cloudSession?.uid)return;
-    checkoutReady=true;paymentButton.hidden=true;$('send-order').hidden=false;status.hidden=true;
-    $('checkout-total').textContent=money(quote.total);$('checkout-delivery-fee').textContent=money(quote.deliveryFee);$('checkout-grand-total').textContent=money(quote.payableTotal);
-   }catch(error){
-    if(version!==checkVersion||actor!==cloudSession?.uid)return;
-    status.textContent=cloudError(error);status.hidden=false;$('send-order').hidden=true;
-   }finally{
-    if(version===checkVersion){paymentButton.disabled=false;paymentButton.innerHTML=checkoutReady?paymentButtonContent:svg('arrow')+' Tentar novamente';paymentFields();}
-   }
-  };
- }
  submitOrder=async function(e){
   e.preventDefault();if(submitting||!validateCheckoutPayment())return;
   const error=R.validateCheckout(cart,loyalty());if(error){toast(error);return;}

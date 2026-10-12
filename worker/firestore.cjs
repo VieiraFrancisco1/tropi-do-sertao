@@ -90,7 +90,7 @@ function createFirestore({ projectId, serviceAccount, fetchImpl = fetch, now = D
   function snap(path,result){return {id:path.split('/').at(-1),ref:doc(path),exists:!!result?.name,data:()=>result?.name?docData(result):undefined};}
   function writes(method,ref,data,opts={}) {
     const nested = method==='update' ? dottedToNested(data) : data;
-    const update = {name:pathFor(ref.path),fields:fieldsOf(nested)};
+    const update = {name:rel(pathFor(ref.path)),fields:fieldsOf(nested)};
     const write = {update};
     if (method==='create') write.currentDocument={exists:false};
     else if (method==='update') {write.currentDocument={exists:true};write.updateMask={fieldPaths:Object.keys(data)};}
@@ -143,17 +143,6 @@ function createFirestore({ projectId, serviceAccount, fetchImpl = fetch, now = D
     }
     throw new Error('Firestore transaction retries exhausted');
   }
-  async function writeAccess(){
-    const bearer=await token();
-    // Read-only IAM test; it does not grant or change any permission.
-    const response=await fetchImpl('https://cloudresourcemanager.googleapis.com/v1/projects/'+projectId+':testIamPermissions',{
-      method:'POST',headers:{authorization:'Bearer '+bearer,'content-type':'application/json'},
-      body:JSON.stringify({permissions:['datastore.entities.create','datastore.entities.update']})
-    });
-    if(!response.ok)return 'unknown';
-    const body=await response.json(),permissions=body.permissions||[];
-    return ['datastore.entities.create','datastore.entities.update'].every(permission=>permissions.includes(permission))?'ok':'missing';
-  }
-  return {doc,collection,runTransaction,accessToken:token,writeAccess};
+  return {doc,collection,runTransaction,accessToken:token};
 }
 module.exports={createFirestore,valueOf,fromValue,fieldsOf,docData,dottedToNested,DbError};

@@ -49,7 +49,7 @@ const call = async (name, data) => {
   };
   let timeout;
   try {
-    if (!['createOrder','validateCheckout'].includes(name)) return await request();
+    if (name !== 'createOrder') return await request();
     const deadline = new Promise((_,reject) => {
       timeout = setTimeout(() => { controller.abort(); reject(expired()); },30000);
     });
@@ -91,7 +91,6 @@ window.TropiCloud = {
   },
   async logout() { stop(); await signOut(auth); },
   createOrder: data => call('createOrder', data),
-  validateCheckout: data => call('validateCheckout', data),
   updateStatus: data => call('updateOrderStatus', data),
   cashAction: data => call('cashAction', data),
   report: data => call('getOrderReport', data),
