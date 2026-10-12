@@ -17,7 +17,8 @@ function configure(env, dependency={}) {
   const expectedOrigins=new Set(String(env.ALLOWED_ORIGINS||'').split(',').map(s=>s.trim()).filter(Boolean));
   if(!expectedOrigins.size)throw new Error('Missing ALLOWED_ORIGINS');
   const authorize=dependency.authorize||((token)=>verifyFirebaseToken(token,env.FIREBASE_PROJECT_ID));
-  const check=dependency.checkApp||((token)=>verifyAppCheck(token,env.FIREBASE_PROJECT_ID,db));
+  if(!dependency.checkApp&&!/^1:\d+:(web|android|ios):[a-zA-Z0-9]+$/.test(env.FIREBASE_APP_ID||''))throw new Error('Missing FIREBASE_APP_ID');
+  const check=dependency.checkApp||((token)=>verifyAppCheck(token,env.FIREBASE_APP_ID));
   async function handle(req,ctx={waitUntil:()=>{}}){
     const url=new URL(req.url),path=url.pathname,origin=req.headers.get('origin')||'',allow=expectedOrigins.has(origin);
     const headers=allow?{'access-control-allow-origin':origin,'vary':'Origin','access-control-allow-headers':'Authorization, Content-Type, X-Firebase-AppCheck','access-control-allow-methods':'POST, OPTIONS','access-control-max-age':'600'}:{};

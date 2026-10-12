@@ -28,7 +28,8 @@ if(LIVE){
   const messages={'auth/invalid-credential':'Telefone ou senha incorretos.','auth/email-already-in-use':'Este telefone já está cadastrado. Use Entrar.','auth/weak-password':'Use uma senha com pelo menos 6 caracteres.','auth/too-many-requests':'Aguarde alguns minutos e tente novamente.','auth/network-request-failed':'Confira sua conexão e tente novamente.'};
   const code=String(error?.code||'').replace(/^firestore\//,'');
   const friendly={'permission-denied':'Não foi possível acessar seus pedidos. Entre novamente.','unavailable':'Confira sua conexão e tente novamente.','failed-precondition':'Não foi possível atualizar seus pedidos agora. Tente novamente.'};
-  toast(messages[error?.code]||friendly[code]||'Não foi possível concluir. Tente novamente.');
+  const publicMessage=typeof error?.publicMessage==='string'?error.publicMessage.slice(0,240):'';
+  toast(messages[error?.code]||publicMessage||friendly[code]||'Não foi possível concluir. Tente novamente.');
  }
  function refreshVisible(){
   if($('account-dialog').open)renderAccount();
@@ -107,8 +108,8 @@ if(LIVE){
   const data={name:String(values.get('customer')||'').trim(),phone:String(values.get('phone')||''),payment,cardType:selected?.dataset.cardType||'',change,
    delivery:values.get('delivery')==='entrega'?'Entrega':'Retirada',neighborhood:String(values.get('neighborhood')||''),address:values.get('delivery')==='entrega'?checkoutAddress(values):'',reference:String(values.get('reference')||''),
    whatsappOptIn:false,lines:cart.map(l=>({...l,extras:[...l.extras]}))};
-  const button=e.currentTarget.querySelector('[type="submit"]');submitting=true;button.disabled=true;
-  const whatsappTab=beginWhatsAppHandoff();
+  const button=e.currentTarget.querySelector('[type="submit"]'),buttonContent=button.innerHTML;submitting=true;button.disabled=true;
+  button.innerHTML=svg('clock')+' Preparando seu pedido...';button.setAttribute('aria-busy','true');
   try{
    const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(data)));
    const fingerprint=[...new Uint8Array(bytes)].map(n=>n.toString(16).padStart(2,'0')).join('');
@@ -116,14 +117,15 @@ if(LIVE){
    if(pending?.fingerprint!==fingerprint)pending={fingerprint,key:uid()};
    save('tropisertao-live-checkout-key',pending);
    const result=await CLOUD.createOrder({...data,requestKey:pending.key}),order=result.order;
-   if(order.customer.id!==cloudSession?.uid){whatsappTab?.close();toast('Pedido registrado na conta anterior. Entre nela para acompanhar.');return;}
+   if(order.customer.id!==cloudSession?.uid){toast('Pedido registrado na conta anterior. Entre nela para acompanhar.');return;}
+   const whatsappUrl=whatsappOrderUrl(order);
    cloudLoyalty=result.loyalty;profile={id:order.customer.id,name:order.customer.name,phone:order.customer.phone};
    orders=[order,...orders.filter(o=>o.id!==order.id)];cart=[];updateCart();
    localStorage.removeItem('tropisertao-live-checkout-key');$('checkout-form').reset();deliveryFields();paymentFields();
    $('success-receipt').innerHTML=`<span>${esc(order.id)}</span><strong>${money(order.payableTotal??order.total)}</strong>`;
    $('success-loyalty').innerHTML=loyaltyMarkup(!order.reward);
-   finishWhatsAppHandoff(order,whatsappTab);
-  }catch(error){whatsappTab?.close();cloudError(error);}finally{submitting=false;button.disabled=!$('checkout-form').elements.payment.value;}
+   finishWhatsAppHandoff(order,whatsappUrl);
+  }catch(error){cloudError(error);}finally{submitting=false;button.innerHTML=buttonContent;button.removeAttribute('aria-busy');button.disabled=!$('checkout-form').elements.payment.value;}
  };
  cashFormSubmit=async function(e){
   const form=e.target;if(!['cash-open-form','cash-movement-form','cash-close-form'].includes(form.id))return;

@@ -24,12 +24,21 @@ const call = async (name, data) => {
   if (!user) throw new Error('Entre na sua conta para continuar.');
   const headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + await user.getIdToken()};
   if (appCheck) headers['X-Firebase-AppCheck'] = (await getToken(appCheck)).token;
-  const response = await fetch(config.workerApiUrl.replace(/\/$/, '') + '/api/' + name, {
-    method: 'POST', headers, body: JSON.stringify(data), cache: 'no-store'
-  });
+  const controller = new AbortController();
+  const timeout = name === 'createOrder' ? setTimeout(() => controller.abort(), 30000) : null;
+  let response;
+  try {
+    response = await fetch(config.workerApiUrl.replace(/\/$/, '') + '/api/' + name, {
+      method: 'POST', headers, body: JSON.stringify(data), cache: 'no-store', signal: controller.signal
+    });
+  } catch {
+    const error = new Error(controller.signal.aborted ? 'O pedido demorou a responder. Tente novamente.' : 'Confira sua conexão e tente novamente.');
+    error.code = 'unavailable'; error.publicMessage = error.message;
+    throw error;
+  } finally { if (timeout !== null) clearTimeout(timeout); }
   let result;
   try { result = await response.json(); } catch { throw new Error('Servidor indisponível. Tente novamente.'); }
-  if (!response.ok) { const error = new Error(result?.error || 'Não foi possível concluir.'); error.code = result?.code || 'unavailable'; throw error; }
+  if (!response.ok) { const message = typeof result?.error === 'string' ? result.error : 'Não foi possível concluir.'; const error = new Error(message); error.code = result?.code || 'unavailable'; error.publicMessage = message; throw error; }
   return result;
 };
 window.TropiCloud = {

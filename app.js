@@ -75,30 +75,20 @@ function whatsappOrderUrl(order){
  ];
  return 'https://wa.me/'+STORE_WHATSAPP_NUMBER+'?text='+encodeURIComponent(details.join('\n'));
 }
-function beginWhatsAppHandoff(){
- const tab=window.open('about:blank','_blank');
- if(tab)try{
-  tab.opener=null;
-  tab.document.title='Preparando seu pedido - Tropi do Sertão';
-  tab.document.body.textContent='Aguarde, preparando sua mensagem para o WhatsApp...';
- }catch{}
- return tab;
-}
-function finishWhatsAppHandoff(order,tab){
- const url=whatsappOrderUrl(order);
+function finishWhatsAppHandoff(order,url=whatsappOrderUrl(order)){
  document.getElementById('success-whatsapp')?.remove();
  const link=document.createElement('a');
  link.id='success-whatsapp';
  link.className='primary full';
  link.href=url;
- link.target='_blank';
+ link.target='_self';
  link.rel='noopener noreferrer';
  link.innerHTML=svg('whatsapp')+' Abrir WhatsApp para enviar';
  $('success-receipt').insertAdjacentElement('afterend',link);
  $('success-title').textContent='Pedido registrado!';
- $('success-title').nextElementSibling.textContent='Finalize o envio da mensagem no WhatsApp. Abrir a conversa não garante que a mensagem foi enviada.';
+ $('success-title').nextElementSibling.textContent='Envie a mensagem no WhatsApp para avisar a loja.';
  showDialog('success-dialog');
- if(tab)try{tab.location.replace(url);return;}catch{}
+ try{window.location.assign(url);return;}catch{}
  toast('Pedido registrado. Toque em "Abrir WhatsApp para enviar".');
 }
 
@@ -378,7 +368,7 @@ function openDetail(id,owner){
  const o=orders.find(x=>x.id===id);if(!o||(!owner&&o.customer.id!==profile.id))return;detailOwner=owner;
  $('detail-title').textContent=o.id;
  $('detail-content').innerHTML=`<div class="order-top"><span class="order-date">${date(o.date)}</span>${statusBadge(o)}</div><section class="detail-section"><h3>Cliente</h3><p><b>${esc(o.customer.name||'Cliente da demonstração')}</b></p><p>${esc(o.customer.phone||'Telefone não informado')}</p></section><section class="detail-section"><h3>Seu pedido${o.reward?' · presente fidelidade':''}</h3>${itemDetails(o)}</section><section class="detail-section"><h3>Recebimento</h3><p>${esc(o.delivery)}</p><p>${esc(o.delivery==='Entrega'?o.address||'Não informado':'Local de retirada a combinar com a loja.')}</p>${o.delivery==='Entrega'&&o.neighborhood?`<p>Bairro: ${esc(o.neighborhood)}</p>`:''}${o.reference?`<p>Referência: ${esc(o.reference)}</p>`:''}</section><section class="detail-section"><h3>Pagamento</h3><p>${esc(o.payment+(o.cardType?' ('+o.cardType+')':''))}</p>${o.change?`<p>Troco para ${money(o.change)}</p>`:''}${o.delivery==='Entrega'?`<p>Taxa de entrega: ${money(o.deliveryFee||0)}</p>`:''}<p><small>Pagamento diretamente com a loja.</small></p></section><div class="detail-total"><span>Total do pedido</span><strong>${money(o.payableTotal??o.total)}</strong></div><p class="help-text">Demonstração. Nenhum pedido enviado à loja.</p>`;
- $('detail-actions').innerHTML=owner?`<div class="detail-actions full"><button class="secondary" data-action="admin">${svg('chevron-left')} Pedidos</button><button class="secondary" data-print="${o.id}">${svg('printer')} Imprimir</button>${statusAction(o)}${['recebido','preparando','entrega'].includes(o.status)?`<button class="text-button" data-status="cancelado" data-order="${o.id}">Cancelar pedido</button>`:''}</div>`:`<button class="secondary full" data-action="orders">Voltar aos meus pedidos</button>`;
+ $('detail-actions').innerHTML=owner?`<div class="detail-actions full"><button class="secondary" data-action="admin">${svg('chevron-left')} Pedidos</button><button class="secondary" data-print="${o.id}">${svg('printer')} Imprimir</button>${statusAction(o)}${['recebido','preparando','entrega'].includes(o.status)?`<button class="text-button" data-status="cancelado" data-order="${o.id}">Cancelar pedido</button>`:''}</div>`:`<div class="detail-actions full">${!['cancelado','concluido'].includes(o.status)?`<a class="primary" href="${esc(whatsappOrderUrl(o))}">${svg('whatsapp')} WhatsApp</a>`:''}<button class="secondary" data-action="orders">Voltar aos meus pedidos</button></div>`;
  showDialog('detail-dialog');
 }
 function printMarkup(o){

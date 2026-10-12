@@ -28,10 +28,12 @@ if (config) {
 const workerText = await load('worker/wrangler.toml');
 if (workerText) {
   const project = workerText.match(/^FIREBASE_PROJECT_ID\s*=\s*"([^"]*)"/m)?.[1];
+  const appId = workerText.match(/^FIREBASE_APP_ID\s*=\s*"([^"]*)"/m)?.[1];
   const origins = workerText.match(/^ALLOWED_ORIGINS\s*=\s*"([^"]*)"/m)?.[1];
   const whatsapp = workerText.match(/^WHATSAPP_ENABLED\s*=\s*"([^"]*)"/m)?.[1];
   if (!project || /SUBSTITUIR|EXEMPLO|YOUR/i.test(project)) errors.push('Defina FIREBASE_PROJECT_ID no worker/wrangler.toml.');
   if (config?.firebase?.projectId && project !== config.firebase.projectId) errors.push('O projeto do Worker não corresponde ao projeto Firebase da interface.');
+  if (!appId || config?.firebase?.appId && appId !== config.firebase.appId) errors.push('O aplicativo do Worker não corresponde ao aplicativo Firebase da interface.');
   if (!origins || /SUBSTITUIR|YOUR/i.test(origins)) errors.push('Configure ALLOWED_ORIGINS com o domínio do Firebase Hosting.');
   else if (config?.firebase?.projectId && !origins.split(',').some(x => x.trim() === 'https://' + config.firebase.projectId + '.web.app')) warnings.push('Verifique se ALLOWED_ORIGINS contém a URL real do Hosting.');
   if (whatsapp !== 'false') warnings.push('WHATSAPP_ENABLED está ativo. Para validar pedidos primeiro, mantenha false.');

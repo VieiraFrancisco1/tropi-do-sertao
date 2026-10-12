@@ -5,7 +5,7 @@ import '../logic.js';
 
 const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const begin = app.indexOf('function storePix(){');
-const end = app.indexOf('\nfunction beginWhatsAppHandoff()', begin);
+const end = app.indexOf('\nfunction finishWhatsAppHandoff(', begin);
 assert.ok(begin >= 0 && end > begin, 'Função de WhatsApp não encontrada');
 const money = n => new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' }).format(n/100);
 const R = globalThis.TropiRules;
