@@ -68,10 +68,10 @@ function orderReport(orders,{period='day',value}={}){
     if(!bounds||!o||typeof o.id!=='string'||!Number.isFinite(o.date)||!Number.isSafeInteger(o.total)||o.total<0||!Object.hasOwn(STATUS_LABELS,o.status))return false;
     const day=periodKey(o.date);return day>=bounds.start&&day<=bounds.end&&!seen.has(o.id)&&seen.add(o.id);
   }).sort((a,b)=>b.date-a.date);
-  const completed=list.filter(o=>o.status==='concluido'),totalCents=completed.reduce((sum,o)=>sum+o.total,0);
+  const completed=list.filter(o=>o.status==='concluido'),totalCents=completed.reduce((sum,o)=>sum+(o.payableTotal??o.total),0);
   const products=new Map(),extras=new Map(),payments={Dinheiro:0,Pix:0,'Cartão':0,Outros:0};
   for(const o of completed){
-    payments[Object.hasOwn(payments,o.payment)?o.payment:'Outros']+=o.total;
+    payments[Object.hasOwn(payments,o.payment)?o.payment:'Outros']+=(o.payableTotal??o.total);
     for(const l of Array.isArray(o.lines)?o.lines:[]){
       if(!validLine(l)||l.reward)continue;
       products.set(l.productId,(products.get(l.productId)||0)+l.qty);
@@ -104,7 +104,7 @@ function cashSummary(session){
 function bookCashSale(sessions,order,at){
   if(!order||order.status!=='concluido'||!isCents(order.total)||!order.id||!Number.isFinite(at)||sessions.some(s=>s.entries.some(e=>e.orderId===order.id)))return sessions;
   const current=sessions.find(s=>s.status==='open');if(!current||at<current.openedAt)return sessions;
-  const entry={id:'sale-'+order.id,type:'sale',orderId:order.id,at,amountCents:order.total,payment:order.payment,reason:order.id};
+  const entry={id:'sale-'+order.id,type:'sale',orderId:order.id,at,amountCents:order.payableTotal??order.total,payment:order.payment,reason:order.id};
   return sessions.map(s=>s===current?{...s,entries:[...s.entries,entry]}:s);
 }
 function cashMovement(session,{id,type,amountCents,reason,at}){

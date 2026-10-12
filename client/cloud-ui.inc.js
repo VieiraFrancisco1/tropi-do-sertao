@@ -11,7 +11,7 @@ if(LIVE){
    ['Seu perfil, pedidos e cartão demonstrativos ficam salvos neste navegador.','Crie uma conta para acessar seus pedidos e cartão em outros dispositivos.'],
    ['Concluir demonstração','Confirmar pedido'],['Demonstração concluída.','Pedido recebido pela TropiSertão.'],
    ['PAINEL DA LOJA · DEMONSTRAÇÃO','PAINEL DA LOJA'],['COMANDA · DEMONSTRAÇÃO','COMANDA'],
-   ['Relatório demonstrativo. Valores dos produtos, sem taxa de entrega.','Valores dos produtos finalizados, sem taxa de entrega.'],
+   ['Relatório demonstrativo. Valores dos produtos, sem taxa de entrega.','Faturamento dos pedidos finalizados, incluindo a entrega.'],
    ['Aceite o pedido, acompanhe o preparo e a entrega e imprima a comanda. As mensagens de WhatsApp são prévias de demonstração.','Aceite o pedido, acompanhe o preparo e a entrega e imprima a comanda. Confira abaixo o estado das mensagens.'],
    ['Caixa demonstrativo, salvo apenas neste navegador. Nenhuma movimentação ou cobrança real.','Caixa sincronizado com a loja. Pix e cartão ficam separados do dinheiro físico.'],
    ['Apresentação da área do dono. Pedidos, caixa e mensagens são simulados e ficam neste navegador.','Pedidos recentes sincronizados com a loja. Os relatórios consultam o período completo no servidor.'],

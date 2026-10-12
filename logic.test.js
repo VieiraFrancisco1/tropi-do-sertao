@@ -162,3 +162,8 @@ assert.ok(newReport.bestSellers.some(p=>p.id==='combo-tropi'&&p.name==='Combo Tr
 assert.ok(newReport.bestSellers.every(p=>!p.name.includes('undefined')));
 assert.equal(R.loyaltyState([{...newOrder,customer:{id:'cliente'}}],'cliente').qualifying,1);
 console.log('Sanduíche, três sucos, combo com sabor obrigatório, preços fixos, ranking e fidelidade: verificados.');
+
+const orderWithDeliveryFee={id:'TROPI-fee',date:Date.parse('2026-10-11T14:00:00-03:00'),status:'concluido',total:600,payableTotal:1100,deliveryFee:500,payment:'Pix',lines:[{productId:'300',qty:1,extras:[],reward:false}],customer:{id:'cliente'}};
+const reportWithFee=R.orderReport([orderWithDeliveryFee],{period:'day',value:'2026-10-11'});
+assert.equal(reportWithFee.totalCents,1100);
+assert.equal(reportWithFee.payments.Pix,1100);

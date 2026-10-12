@@ -224,7 +224,7 @@ function renderOrders(){
 }
 function renderAdmin(){
  const active=orders.filter(o=>o.status!=='cancelado'),q=normal($('admin-search').value);
- $('admin-stats').innerHTML=`<div><small>Todos os pedidos</small><strong>${orders.length}</strong></div><div><small>Em andamento</small><strong>${active.filter(o=>o.status!=='concluido').length}</strong></div><div><small>Vendas finalizadas</small><strong>${money(active.filter(o=>o.status==='concluido').reduce((n,o)=>n+o.total,0))}</strong></div>`;
+ $('admin-stats').innerHTML=`<div><small>Todos os pedidos</small><strong>${orders.length}</strong></div><div><small>Em andamento</small><strong>${active.filter(o=>o.status!=='concluido').length}</strong></div><div><small>Vendas finalizadas</small><strong>${money(active.filter(o=>o.status==='concluido').reduce((n,o)=>n+(o.payableTotal??o.total),0))}</strong></div>`;
  const list=orders.filter(o=>(filter==='todos'||filter==='pendentes'&&['recebido','preparando','entrega'].includes(o.status)||o.status===filter)&&normal(o.id+' '+o.customer.name+' '+o.customer.phone).includes(q));
  $('admin-content').innerHTML=list.length?list.map(o=>orderCard(o,true)).join(''):`<div class="empty-state"><span class="empty-icon">${svg('store')}</span><h3>${orders.length?'Nenhum pedido neste filtro':'Sua operação, organizada.'}</h3><p>${orders.length?'Experimente outra busca ou status.':'Carregue exemplos para conhecer os pedidos e acompanhar cada etapa.'}</p>${!orders.length?'<button class="primary" data-action="sample-orders">Carregar pedidos de exemplo</button>':''}</div>`;
  document.querySelectorAll('[data-filter]').forEach(b=>{const on=b.dataset.filter===filter;b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on));});
