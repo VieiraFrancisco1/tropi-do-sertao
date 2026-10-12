@@ -40,11 +40,14 @@ for (const filename of await readdir(path.join(root,'assets'))) {
 // suas imagens substituem as antigas usando os mesmos identificadores nos cards.
 // Nao altera fotos da logo nem o layout dos produtos.
 let uploadedPhotoCount=0;
+const externalPhotos=new Map();
 try {
   const photoZip=await readFile(path.join(root,'assets','fotos-tropi-2026.zip'));
   const replacements=unpackTropiPhotos(photoZip);
   for(const [filename,bytes] of replacements) {
-    assets['assets/'+filename]='data:image/webp;base64,'+bytes.toString('base64');
+    const url='fotos/'+filename.replace(/\.webp$/,'.'+fingerprint(bytes)+'.webp');
+    assets['assets/'+filename]=url;
+    externalPhotos.set(url,bytes);
   }
   uploadedPhotoCount=replacements.size;
 } catch(error) {
@@ -61,6 +64,11 @@ js = js.replace('const asset=path=>path;', 'const bundledAssets='+JSON.stringify
 const runtime = 'window.TropiConfig=' + JSON.stringify(config).replaceAll('<','\\u003c')+';';
 const dist = path.join(root,'dist');
 await rm(dist,{recursive:true,force:true});await mkdir(dist,{recursive:true});
+for (const [filepath,bytes] of externalPhotos) {
+  const output=path.join(dist,filepath);
+  await mkdir(path.dirname(output),{recursive:true});
+  await writeFile(output,bytes);
+}
 const manifest = {};
 for (const [prefix,ext,contents] of [
   ['visual','css',css], ['config','js',runtime], ['regras','js',logic], ['firebase','js',cloud], ['site','js',js]

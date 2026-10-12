@@ -66,3 +66,6 @@ html{scroll-padding-top:82px}.header-inner{min-height:76px;padding:6px 22px;grid
 .checkout-grand-total{margin-top:8px;padding-top:10px;border-top:1px solid #d6e8cc}.checkout-grand-total strong{color:#256b33}
 #customer-neighborhood{min-height:46px;width:100%;background:#fff;color:#24482a;padding:10px 12px;border-radius:12px}
 @media(max-width:420px){.store-status{font-size:10px;padding:6px 7px}.store-strip{gap:5px;flex-wrap:wrap;justify-content:space-between}}
+
+/* Fotos novas: mostrar o produto inteiro, sem cortes nem distorcao. */
+.product-photo img,.extra-card>img{object-fit:contain;object-position:center;}
