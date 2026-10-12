@@ -1,12 +1,12 @@
 # Tropi do Sertão — ativar pedidos e WhatsApp sem Blaze
 
-**Situação em 11/10/2026:** código de adaptação preparado e testes unitários locais executados. **Não foi publicado** no Firebase, Cloudflare ou Meta; não foram configurados segredos nem enviados pedidos/mensagens reais. O site Vercel continua como demonstração. A estrutura `functions/` anterior foi conservada para referência, mas **não deve ser publicada no plano Spark**.
+**Situação em 12/10/2026:** código da franquia de até 1.000 mensagens de serviço preparado e testes automatizados adicionados. **Não foi publicado** no Firebase, Cloudflare ou Meta; não foram configurados segredos nem enviados pedidos/mensagens reais. O site Vercel continua como demonstração. A estrutura `functions/` anterior foi conservada para referência, mas **não deve ser publicada no plano Spark**.
 
 ## Arquitetura
 
 - **Firebase Spark:** Firebase Hosting (interface), Authentication (login/anônimo), Firestore (pedidos, clientes, caixa, fidelidade) e App Check. Sem Cloud Functions, Cloud Run ou Blaze.
 - **Cloudflare Workers Free:** cinco endpoints autenticados para pedidos/status/caixa/relatórios/conexão; valida os tokens Firebase Auth + App Check; processa a fila e o webhook oficial Meta; guarda as credenciais apenas no Worker.
-- **WhatsApp Business Platform (Cloud API):** dois modelos utilitários aprovados pela Meta. Somente para clientes que marcaram o consentimento específico durante a compra; SAIR/PARAR/STOP bloqueia novos envios. **Mensagens podem ter custo de cobrança da Meta.**
+- **WhatsApp Business Platform (Cloud API):** duas mensagens de serviço (texto livre), exclusivamente após mensagem recebida do cliente pelo WhatsApp oficial, com consentimento no checkout e dentro da janela de atendimento de 24h. SAIR/PARAR/STOP bloqueia envios. O Worker reserva até 1.000 tentativas no mês e não envia templates pagos. **A cota da Meta é compartilhada com outros serviços que utilizem o mesmo número: não é possível garantir custo zero sem conferir o painel da Meta.**
 
 **Não é automação pelo WhatsApp Web.** O sistema exige um número apto a usar a API oficial da Meta. Não coloque credenciais Meta, chave de conta de serviço ou token no frontend ou no repositório.
 
@@ -67,8 +67,8 @@ Esse comando de publicação utiliza **apenas Hosting e Firestore (regras + índ
 Depois que os pedidos reais **estiverem validados com WhatsApp desativado**:
 
 1. Configure o portfólio empresarial, WABA, número de telefone, token de acesso permanente/autorizado e o aplicativo Meta. Confira coexistência/migração do número com seu fornecedor.
-2. Cadastre para aprovação os modelos em `docs/whatsapp-templates.json`: `tropi_pedido_em_preparo` e `tropi_pedido_saiu_entrega`, idioma `pt_BR`. O WhatsApp/Meta decide categoria, aprovação e preço aplicáveis. Não habilite os envios sem modelos aprovados.
-3. Preencha `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_WABA_ID`, `WHATSAPP_GRAPH_API_VERSION` no `worker/wrangler.toml` com IDs/versão válidos.
+2. **Não cadastre templates de utilidade para a franquia gratuita**: esses modelos são cobrados desde 01/10/2026, inclusive dentro da janela de 24 horas. A integração atual envia **mensagens de serviço (texto livre)** exclusivamente quando um webhook oficial registra a entrada de uma mensagem do cliente até 23h45 antes do envio; fora dessa janela, nenhum aviso é enviado. O arquivo `docs/whatsapp-templates.json` é material histórico e não é usado nessa configuração.
+3. Preencha `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_WABA_ID`, `WHATSAPP_GRAPH_API_VERSION` no `worker/wrangler.toml` com IDs/versão válidos. Verifique `WHATSAPP_BILLING_TIME_ZONE` conforme o fuso da WABA e mantenha `WHATSAPP_MONTHLY_CAP = "1000"` ou escolha valor menor. O bloqueio por cota contabiliza tentativas reservadas, não apenas entregas, e só considera envios por este Worker.
 4. Execute (cada um pede seu segredo no terminal):
 
 ```powershell
@@ -79,7 +79,7 @@ npx wrangler secret put WHATSAPP_VERIFY_TOKEN --config worker/wrangler.toml
 
 5. Coloque `WHATSAPP_ENABLED = "true"` no `worker/wrangler.toml` e publique novamente com `npx wrangler deploy --config worker/wrangler.toml`.
 6. Na Meta, configure o webhook como `https://tropisertao-api.SEUSUBDOMINIO.workers.dev/api/whatsapp/webhook`. Use o mesmo `WHATSAPP_VERIFY_TOKEN` e assine `messages`/WABA. O webhook confere a assinatura HMAC com o **App Secret**. O callback **não fica em `firebase.web.app`** nesta versão.
-7. Teste o pedido com seu próprio telefone e consentimento marcado. Teste também sem consentimento (não pode enviar); confirme preparo, saída para entrega, cancelamento, status de entrega e texto SAIR. Em retirada, não há mensagem de saída para entrega. O Worker tenta o envio após a mudança de status; um cron faz nova verificação a cada 2 minutos.
+7. Teste o pedido com seu próprio telefone e consentimento marcado, enviando realmente uma mensagem para o número da API no WhatsApp para iniciar a janela de 24h. Teste também sem consentimento, sem entrada registrada, ao atingir o limite, status e texto SAIR. Em retirada, não há mensagem de saída para entrega. O Worker tenta o envio após a mudança de status; um cron faz nova verificação a cada 2 minutos. Se o webhook não receber a mensagem do cliente (por exemplo, coexistência mal configurada), **não envia** e preserva o custo.
 
 Os casos de rede ambígua são marcados `unknown` e exigem conferência no painel Meta; não são reenviados automaticamente, reduzindo risco de mensagens duplicadas. Os estados podem ser atualizados pelo webhook; a Meta não garante entrega a todos os telefones.
 
