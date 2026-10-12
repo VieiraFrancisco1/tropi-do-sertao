@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir, readdir, copyFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { unpackTropiPhotos } from './photo-archive.mjs';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,6 +36,21 @@ const assets = {};
 for (const filename of await readdir(path.join(root,'assets'))) {
   if (filename.endsWith('.webp')) assets['assets/'+filename] = 'data:image/webp;base64,' + (await readFile(path.join(root,'assets',filename))).toString('base64');
 }
+// Quando o arquivo de fotos em alta resolucao for enviado ao repositorio,
+// suas imagens substituem as antigas usando os mesmos identificadores nos cards.
+// Nao altera fotos da logo nem o layout dos produtos.
+let uploadedPhotoCount=0;
+try {
+  const photoZip=await readFile(path.join(root,'assets','fotos-tropi-2026.zip'));
+  const replacements=unpackTropiPhotos(photoZip);
+  for(const [filename,bytes] of replacements) {
+    assets['assets/'+filename]='data:image/webp;base64,'+bytes.toString('base64');
+  }
+  uploadedPhotoCount=replacements.size;
+} catch(error) {
+  if(error.code!=='ENOENT') throw error;
+}
+
 // As fotos continuam iguais as do site de referencia da Vercel.
 html = html.replace(/assets\/[\w-]+\.webp/g, key => assets[key] || key);
 for (const [,font] of css.matchAll(/(assets\/[\w-]+\.woff)/g)) {
@@ -64,6 +80,6 @@ if (!html.includes('id="cardapio"') || !html.includes('id="account-dialog"') || 
 const version = fingerprint(html);
 html = html.replace('</head>', `<meta name="tropi-build" content="${version}"></head>`);
 await writeFile(path.join(dist,'index.html'),html);
-await writeFile(path.join(dist,'build-info.json'),JSON.stringify({mode,projectId:config.firebase?.projectId||null,builtAt:new Date().toISOString(),version,manifest},null,2));
+await writeFile(path.join(dist,'build-info.json'),JSON.stringify({mode,projectId:config.firebase?.projectId||null,builtAt:new Date().toISOString(),version,uploadedPhotoCount,manifest},null,2));
 await copyFile(path.join(root,'preview.html'),path.join(dist,'preview.html'));
 console.log('Build '+mode+' concluido. Versao: '+version+'; arquivos JS e CSS separados, com cache individual.');
