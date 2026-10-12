@@ -26,7 +26,7 @@ if (mode !== 'demo') {
 }
 let html = await read('src.html');
 let css = await read('style.css');
-let js = (await read('app.js')).replace('// CLOUD_BRIDGE', await read('client/cloud-ui.inc.js'));
+let js = await read('client/whatsapp-return.js') + '\n' + (await read('app.js')).replace('// CLOUD_BRIDGE', await read('client/cloud-ui.inc.js'));
 if (!js.includes('window.TropiCloud') && !js.includes('CLOUD')) throw new Error('Interface do Firebase ausente.');
 const logic = await read('logic.js');
 await mkdir(path.join(root, 'functions/lib'), {recursive:true});
@@ -81,6 +81,7 @@ for (const [prefix,ext,contents] of [
 const link = `<link rel="stylesheet" href="${manifest.visual}">`;
 const scripts = `<script src="${manifest.config}" defer></script><script src="${manifest.regras}" defer></script><script src="${manifest.firebase}" defer></script><script src="${manifest.site}" defer></script>`;
 html = html.replace('<link rel="stylesheet" href="style.css">', link)
+  .replace('<script src="client/whatsapp-return.js"></script>', '')
   .replace('<script src="logic.js"></script>', scripts)
   .replace('<script src="app.js"></script>', '');
 if (!html.includes(manifest.visual) || !html.includes(manifest.firebase) || !html.includes(manifest.site)) throw new Error('HTML invalido: as referencias dos arquivos JS e CSS nao foram aplicadas.');

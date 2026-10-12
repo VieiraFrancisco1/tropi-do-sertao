@@ -63,18 +63,7 @@ test('REST adapter transaction emits precondition for create, merges fields and 
   assert.equal(JSON.parse(commit.opts.body).writes[0].update.name,'projects/demo-tropisertao/databases/(default)/documents/orders/order-1');
   assert.match(events[0].opts.body,/grant_type/);
 });
-function fakeDb(){
- const store=new Map();
- const doc=path=>({path,id:path.split('/').at(-1),async get(){return snap(path);},async set(data,opts){write(path,data,opts);}});
- function snap(path){return{ref:doc(path),exists:store.has(path),data:()=>store.has(path)?structuredClone(store.get(path)):undefined};}
- function merge(a,b){for(const [k,v] of Object.entries(b)){if(v&&typeof v==='object'&&!Array.isArray(v)){a[k]=merge(a[k]||{},v);}else a[k]=v;}return a;}
- function write(path,data,opts){store.set(path,opts?.merge?merge(structuredClone(store.get(path)||{}),structuredClone(data)):structuredClone(data));}
- return {store,doc,runTransaction:async cb=>{
-  const writes=[];
-  const tx={get:async ref=>snap(ref.path),create:(ref,data)=>writes.push(()=>{if(store.has(ref.path))throw new Error('Document exists');write(ref.path,data);}),set:(ref,data,opts)=>writes.push(()=>write(ref.path,data,opts)),update:(ref,data)=>writes.push(()=>{const obj=structuredClone(store.get(ref.path)||{});for(const [k,v] of Object.entries(data)){const parts=k.split('.');let cursor=obj;for(const p of parts.slice(0,-1)){cursor=cursor[p]||=( {} );}cursor[parts.at(-1)]=v;}write(ref.path,obj);})};
-  const result=await cb(tx);for(const w of writes)w();return result;
- },collection(name){let checks=[];return{where(key,op,value){checks.push([key,op,value]);return this;},async get(){return{docs:[...store.entries()].filter(([path])=>path.startsWith(name+'/')).filter(([,x])=>checks.every(([k,op,v])=>{const item=k.split('.').reduce((x,p)=>x?.[p],x);return op==='>='?item>=v:op==='<='?item<=v:op==='=='?item===v:false;})).map(([path,data])=>({id:path.split('/').at(-1),data:()=>structuredClone(data)}))};}};}};
-}
+const {memoryDb:fakeDb}=require('../../functions/test/memory-db.cjs');
 test('customer order flow preserves server price and idempotency; owner changes stage',async()=>{
  const db=fakeDb();
  const customer={uid:'shopper1',admin:false},owner={uid:'owner1',admin:true};
@@ -88,7 +77,7 @@ test('customer order flow preserves server price and idempotency; owner changes 
  assert.equal(result.status,200);let second=await result.json();
  assert.equal(second.duplicate,true);assert.equal(second.order.id,first.order.id);
  assert.equal(db.store.get('controls/orderCounter').value,1);
- assert.equal(db.store.get('customers/shopper1').loyalty.qualifying,1);
+ assert.equal(db.store.get('customers/shopper1').loyalty.qualifying,0);
  result=await api.handle(makeReq('updateOrderStatus',{id:first.order.id,status:'preparando',expectedStatus:'recebido'}));
  assert.equal(result.status,403);
  current=owner;
@@ -102,6 +91,7 @@ test('customer order flow preserves server price and idempotency; owner changes 
  assert.equal(result.status,200);
  assert.equal((await result.json()).order.status,'concluido');
  assert.equal(db.store.get('cashSessions/cash-request-00001').entries.length,1);
+ assert.equal(db.store.get('customers/shopper1').loyalty.qualifying,1);
 });
 test('Firebase JWT signature, project, issuer and expiry are verified',async()=>{
  const {verifyFirebaseToken}=require('../auth.cjs');
@@ -141,4 +131,26 @@ test('health reports a database failure without leaking credentials or upstream 
   const response=await api.handle(new Request('https://tropi.workers.dev/api/health'));
   assert.equal(response.status,503);
   assert.deepEqual(await response.json(),{status:'unavailable',database:'unavailable',diagnostic:{status:403,code:'PERMISSION_DENIED'},whatsappEnabled:false});
+});
+
+test('the loyalty endpoint is scoped to the authenticated customer, ignoring a forged UID',async()=>{
+ const db=fakeDb();
+ db.store.set('customers/another',{id:'another',loyalty:{version:2,qualifying:8,redeemed:0,reserved:0}});
+ const api=configure(baseEnv,{db,authorize:async()=>({uid:'buyer',admin:false}),checkApp:async()=>true});
+ const response=await api.handle(makeReq('getLoyalty',{uid:'another',qualifying:100}));
+ assert.equal(response.status,200);assert.equal((await response.json()).loyalty.qualifying,0);
+ assert.equal(db.store.get('customers/another').loyalty.qualifying,8);
+ assert.equal(db.store.has('customers/buyer'),false);
+});
+
+test('scheduled cleanup expires unattended orders even with automatic WhatsApp disabled',async()=>{
+ const db=fakeDb();
+ db.store.set('customers/buyer',{id:'buyer',pendingOrderId:'TROPI-001',loyalty:{version:2,qualifying:0,redeemed:0,reserved:0}});
+ db.store.set('orders/TROPI-001',{id:'TROPI-001',customer:{id:'buyer'},date:Date.now()-86400000,status:'recebido',reward:false,total:600});
+ const api=configure(baseEnv,{db,authorize:async()=>({uid:'buyer'}),checkApp:async()=>true});
+ await api.scheduled();
+ assert.equal(db.store.get('orders/TROPI-001').expired,true);
+ assert.equal(db.store.get('customers/buyer').pendingOrderId,null);
+ assert.equal(db.store.get('customers/buyer').loyalty.qualifying,0);
+ assert.equal([...db.store.keys()].some(path=>path.startsWith('messageJobs/')),false);
 });

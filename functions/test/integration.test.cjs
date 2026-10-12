@@ -16,18 +16,18 @@ const customer = { uid: 'customer-one' }, other = { uid: 'customer-two' }, owner
 const config = { enabled: true, token: 'local-test-token', phoneNumberId: '1234567890', wabaId: '0987654321', version: 'v24.0', appSecret: 'local-test-app-secret', preparoTemplate: 'tropi_pedido_em_preparo', entregaTemplate: 'tropi_pedido_saiu_entrega', language: 'pt_BR' };
 let now = Date.parse('2026-10-10T14:00:00-03:00'), rules;
 const service = createService({ db, clock: () => now, whatsappEnabled: () => true });
-const checkout = overrides => ({ requestKey: crypto.randomUUID(), name: 'Cliente fictício', phone: '88900000001', payment: 'Dinheiro', delivery: 'Entrega', address: 'Endereço fictício para teste local', whatsappOptIn: true, lines: [{ productId: '300', extras: [], qty: 1, reward: false }], ...overrides });
+const checkout = overrides => ({ requestKey: crypto.randomUUID(), name: 'Cliente fictício', phone: '88900000001', payment: 'Dinheiro', delivery: 'Entrega', neighborhood: 'Centro', address: 'Endereço fictício para teste local', whatsappOptIn: true, lines: [{ productId: '300', extras: [], qty: 1, reward: false }], ...overrides });
 test.before(async () => {
   rules = await initializeTestEnvironment({ projectId, firestore: { rules: fs.readFileSync('firestore.rules', 'utf8') } });
   await rules.clearFirestore();
 });
 test.after(async () => { await rules.cleanup(); await deleteApp(app); });
-test('concurrent duplicate checkout creates exactly one order and one loyalty stamp', async () => {
+test('concurrent duplicate checkout creates exactly one pending order without a loyalty stamp', async () => {
   const input = checkout({ total: 1 });
   const results = await Promise.all([service.createOrder(customer, input), service.createOrder(customer, input)]);
   assert.equal(results[0].order.id, results[1].order.id);
   assert.equal((await db.collection('orders').get()).size, 1);
-  assert.equal((await db.doc('customers/customer-one').get()).data().loyalty.qualifying, 1);
+  assert.equal((await db.doc('customers/customer-one').get()).data().loyalty.qualifying, 0);
   assert.equal(results[0].order.total, 600);
 });
 test('rules isolate customers, reject direct mutation, and restrict cash/messages to owner', async () => {
@@ -50,7 +50,7 @@ test('status transitions enqueue one job despite duplicate updates', async () =>
   await Promise.all([service.updateStatus(owner, input), service.updateStatus(owner, input)]);
   assert.equal((await db.collection('messageJobs').get()).size, 1);
   assert.equal((await db.doc('orders/TROPI-001').get()).data().status, 'preparando');
-  await assert.rejects(service.updateStatus(owner, { id: 'TROPI-001', status: 'concluido', expectedStatus: 'preparando' }), /mudança/);
+  await assert.rejects(service.updateStatus(owner, { id: 'TROPI-001', status: 'recebido', expectedStatus: 'preparando' }), /mudança/);
 });
 test('parallel workers send once; signed read webhook outranks late sent event', async () => {
   let calls = 0, sentBody;
@@ -74,6 +74,7 @@ test('completion is booked once in cash and included in full month report', asyn
   now += 1000;
   const finish = { id: 'TROPI-001', status: 'concluido', expectedStatus: 'entrega' };
   await Promise.all([service.updateStatus(owner, finish), service.updateStatus(owner, finish)]);
+  assert.equal((await db.doc('customers/customer-one').get()).data().loyalty.qualifying, 1);
   const cash = (await db.doc('cashSessions/' + session.id).get()).data();
   assert.equal(cash.entries.length, 1); assert.equal(cash.entries[0].amountCents, 600);
   const report = await service.report(owner, { period: 'month', value: '2026-10' });
@@ -111,11 +112,11 @@ test('ambiguous network failure is not retried; explicit rate rejection is sched
 });
 test('gift claims and cancellation keep server loyalty consistent', async () => {
   const uid = 'loyal-customer';
-  await db.doc('customers/' + uid).set({ id: uid, loyalty: { qualifying: 10, redeemed: 0 } });
+  await db.doc('customers/' + uid).set({ id: uid, loyalty: { version: 2, qualifying: 10, redeemed: 0, reserved: 0 } });
   const input = checkout({ lines: [{ productId: '500', extras: ['ninho'], qty: 1, reward: true }] });
   const gift = (await service.createOrder({ uid }, input)).order;
   assert.equal(gift.total, 0); assert.equal(gift.reward, true);
-  await assert.rejects(service.createOrder({ uid }, { ...input, requestKey: crypto.randomUUID() }), /presente/);
+  await assert.rejects(service.createOrder({ uid }, { ...input, requestKey: crypto.randomUUID() }), /aguardando/);
   await service.updateStatus(owner, { id: gift.id, status: 'cancelado', expectedStatus: 'recebido' });
   assert.equal((await db.doc('customers/' + uid).get()).data().loyalty.redeemed, 0);
 });

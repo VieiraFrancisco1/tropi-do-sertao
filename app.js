@@ -76,13 +76,13 @@ function whatsappOrderUrl(order){
  return 'https://wa.me/'+STORE_WHATSAPP_NUMBER+'?text='+encodeURIComponent(details.join('\n'));
 }
 function finishWhatsAppHandoff(order,url=whatsappOrderUrl(order)){
- const link=$('success-whatsapp');
+ preparedWhatsAppOrder=order;preparedCart=JSON.stringify(cart);
+ const link=$('checkout-whatsapp');
  link.href=url;
- $('success-whatsapp-footer').hidden=false;
- $('success-receipt').innerHTML=`<span>${esc(order.id)}</span><strong>${money(order.payableTotal??order.total)}</strong>`;
- $('success-title').textContent='Pedido registrado!';
- $('success-title').nextElementSibling.textContent='Toque em Enviar pedido para WhatsApp para abrir a conversa com sua mensagem pronta.';
- showDialog('success-dialog');
+ link.hidden=false;$('send-order').hidden=true;
+ $('checkout-submit-status').hidden=false;
+ $('checkout-submit-status').textContent='Tudo pronto. Envie sua mensagem para a loja no WhatsApp.';
+ $('checkout-submit-status').classList.add('is-ready');
  // Keep the final handoff as a native link: mobile app opening needs a fresh tap,
  // which an asynchronous order registration cannot reliably preserve.
  link.focus({preventScroll:true});
@@ -145,16 +145,66 @@ let pairingIds=new Set(),builderExtraPreview=null;
 let category='tudo',builder={productId:'300',extras:[],qty:1,reward:false},filter='pendentes',detailOwner=false,lastFocus=null,reportPeriod='day';
 const states=R.STATUS_LABELS;
 const loyalty=()=>LIVE&&cloudLoyalty?cloudLoyalty:R.loyaltyState(orders,profile.id);
+let preparedWhatsAppOrder=null,preparedCart='',returnedOrderId=null,loyaltyReady=!LIVE,welcomeCount=-1,welcomeTimer;
+const whatsappReturn=window.TropiWhatsAppReturn.createReturnTracker({
+ read:()=>read('tropisertao-live-whatsapp-return',null),
+ write:value=>save('tropisertao-live-whatsapp-return',value),
+ remove:()=>{try{localStorage.removeItem('tropisertao-live-whatsapp-return');}catch{}}
+});
+function clearWhatsAppHandoff(){
+ preparedWhatsAppOrder=null;preparedCart='';
+ $('checkout-whatsapp').hidden=true;$('checkout-whatsapp').removeAttribute('href');
+ $('checkout-submit-status').classList.remove('is-ready');
+}
+function beginWhatsAppHandoff(order){
+ if(!LIVE||order?.customer.id!==cloudSession?.uid)return;
+ whatsappReturn.begin({uid:order.customer.id,id:order.id});
+ if(order===preparedWhatsAppOrder&&JSON.stringify(cart)===preparedCart){cart=[];updateCart();}
+ try{localStorage.removeItem('tropisertao-live-checkout-key');}catch{}
+}
+function resumeWhatsAppReturn(){
+ if(!LIVE||document.hidden||!cloudSession||!loyaltyReady)return false;
+ const pending=whatsappReturn.peek(cloudSession.uid);if(!pending)return false;
+ const order=orders.find(item=>item.id===pending.id&&item.customer.id===cloudSession.uid)||
+  (preparedWhatsAppOrder?.id===pending.id&&preparedWhatsAppOrder.customer.id===cloudSession.uid?preparedWhatsAppOrder:null);
+ if(!order)return false;
+ whatsappReturn.consume(cloudSession.uid);
+ clearWhatsAppHandoff();$('checkout-form').reset();deliveryFields();resetCheckoutSteps();
+ returnedOrderId=order.id;renderReturnedOrder(order);
+ $('success-whatsapp-footer').hidden=true;
+ showDialog('success-dialog');return true;
+}
+function renderReturnedOrder(order){
+ const completed=order.status==='concluido',expired=!R.visibleOrder(order),canceled=order.status==='cancelado';
+ $('success-dialog').classList.toggle('is-pending',!completed);
+ $('success-title').textContent=completed?'Pedido finalizado pela loja':expired?'Pedido não confirmado':canceled?'Pedido cancelado':order.status==='recebido'?'Aguardando a loja':states[order.status];
+ $('success-title').nextElementSibling.textContent=completed?'Seu cartão fidelidade já está atualizado.':expired?'Este pedido expirou sem confirmação da loja. Você pode fazer um novo pedido.':canceled?'Este pedido foi cancelado pela loja e não conta na fidelidade.':'A fidelidade será atualizada quando o dono finalizar seu pedido.';
+ $('success-receipt').innerHTML=`<span>${esc(order.id)}</span><strong>${money(order.payableTotal??order.total)}</strong>`;
+ $('success-loyalty').innerHTML=loyaltyMarkup(completed&&!order.reward);
+}
+function updateLoyaltyUI(){
+ const state=loyalty(),count=loyaltyReady&&!cloudSession?.owner?state.qualifying:0;
+ $('loyalty-badge').hidden=count===0;$('loyalty-badge').textContent=String(count);
+ $('club-teaser').setAttribute('aria-label','Clube Tropi: ver meu cartão fidelidade'+(count?', '+count+(count===1?' pedido finalizado':' pedidos finalizados'):''));
+ if($('success-dialog').open){const order=orders.find(item=>item.id===returnedOrderId&&item.customer.id===cloudSession?.uid);if(order)renderReturnedOrder(order);}
+ if(count<=0||count===welcomeCount)return;
+ if(document.hidden||document.querySelector('dialog[open]')||whatsappReturn.peek(cloudSession?.uid))return;
+ welcomeCount=count;
+ $('loyalty-welcome-content').innerHTML=`<small>CLUBE TROPI · SEU CARTÃO</small><strong>${state.available?'Seu presente está disponível!':state.stamps+' de 10 pedidos concluídos'}</strong><span class="welcome-stamps" aria-hidden="true">${Array.from({length:10},(_,i)=>`<i class="${i<state.stamps?'checked':''}">${i<state.stamps?svg('check'):''}</i>`).join('')}</span><span>Ver meu cartão ${svg('arrow')}</span>`;
+ $('loyalty-welcome').hidden=false;
+ clearTimeout(welcomeTimer);welcomeTimer=setTimeout(()=>$('loyalty-welcome').hidden=true,8500);
+}
 const total=()=>R.cartTotal(cart);
 function toast(text){$('toast').textContent=text;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),3000);}
 function showDialog(id){
+  $('loyalty-welcome').hidden=true;
   if(id!=='orders-dialog'&&location.hash==='#pedidos')history.replaceState(null,'',location.pathname+location.search);
   if(!document.querySelector('dialog[open]'))lastFocus=document.activeElement;
   document.querySelectorAll('dialog[open]').forEach(d=>d.close());
   document.body.style.overflow='hidden';$(id).showModal();
   $(id).querySelector('.sheet-scroll')?.scrollTo(0,0);
 }
-function closeDialog(d){d.close();if(d.id==='orders-dialog'&&location.hash==='#pedidos')history.replaceState(null,'',location.pathname+location.search);if(!document.querySelector('dialog[open]')){document.body.style.overflow='';if(lastFocus?.isConnected)lastFocus.focus({preventScroll:true});}}
+function closeDialog(d){d.close();if(d.id==='orders-dialog'&&location.hash==='#pedidos')history.replaceState(null,'',location.pathname+location.search);if(!document.querySelector('dialog[open]')){document.body.style.overflow='';if(lastFocus?.isConnected)lastFocus.focus({preventScroll:true});updateLoyaltyUI();}}
 function choose(){document.querySelectorAll('dialog[open]').forEach(closeDialog);category='tudo';$('search').value='';renderMenu();$('cardapio').scrollIntoView({behavior:motion.matches?'auto':'smooth'});}
 function renderMenu(){
  const q=normal($('search').value.trim()),matches=s=>normal(s).includes(q);
@@ -231,28 +281,28 @@ function loyaltyMarkup(celebrate=false){
  return `<section class="loyalty-card" aria-label="Cartão fidelidade: ${s.qualifying} ${s.qualifying===1?'pedido':'pedidos'}, ${s.available} ${s.available===1?'presente disponível':'presentes disponíveis'}"><div class="loyalty-card-top"><div><small>CLUBE TROPI · FIDELIDADE</small><h3>${ready?'Seu Tropi grátis chegou!':'Mais sabor. Mais presentes.'}</h3></div><span data-fruit="strawberry">${fruit('strawberry')}</span></div><p>10 pedidos dão direito a um <b>500 ml</b><br>com até <b>5 adicionais</b>.</p><div class="stamp-grid">${stamps}</div><div class="loyalty-meta"><span><b>${s.stamps}/10</b> neste cartão</span><span>${ready?'Presente liberado':s.remaining===1?'Falta só 1 pedido':s.remaining+' pedidos para seu presente'}</span></div><div class="loyalty-track" style="--progress:${s.stamps*10}%"><span></span></div>${ready?`<div class="reward-ready"><strong>${s.available} ${s.available===1?'presente disponível':'presentes disponíveis'}</strong>500 ml + até 5 adicionais. Do seu jeito.</div><button class="primary full reward-button" data-action="reward">Montar meu Tropi grátis ${svg('gift')}</button>`:''}</section>`;
 }
 function renderAccount(){
- const today=R.orderReport(orders,{value:R.periodKey(Date.now())}),running=orders.filter(o=>['recebido','preparando','entrega'].includes(o.status));
+ const today=R.orderReport(orders.filter(o=>R.visibleOrder(o)),{value:R.periodKey(Date.now())}),running=orders.filter(o=>R.visibleOrder(o)&&['recebido','preparando','entrega'].includes(o.status));
  $('account-content').innerHTML=`<div class="owner-heading"><img src="${asset('assets/logo.webp')}" alt="" width="48" height="48"><div><span class="owner-label">VISÃO DO DONO</span><h3>TropiSertão</h3><p>Sua loja, em um só lugar.</p></div><span class="owner-label owner-demo">DEMO</span></div><div class="owner-summary"><div><small>Pedidos de hoje</small><strong>${today.totalCount}</strong></div><div><small>Em andamento</small><strong>${running.length}</strong></div><div><small>Finalizados hoje</small><strong>${money(today.totalCents)}</strong></div></div><h3 class="owner-section-title">Gerencie sua loja</h3><div class="owner-menu"><button data-action="admin"><span class="owner-menu-icon">${svg('receipt')}</span><strong>Pedidos</strong><small>Aceite, acompanhe e imprima</small>${svg('chevron-right')}</button><button data-action="cash"><span class="owner-menu-icon">${svg('wallet')}</span><strong>Controle de caixa</strong><small>${cashSessions.some(s=>s.status==='open')?'Caixa aberto · acompanhar':'Abra, confira e feche'}</small>${svg('chevron-right')}</button><button data-action="report-day"><span class="owner-menu-icon">${svg('calendar')}</span><strong>Relatório diário</strong><small>Veja os resultados do dia</small>${svg('chevron-right')}</button><button data-action="report-week"><span class="owner-menu-icon">${svg('chart')}</span><strong>Relatório semanal</strong><small>De segunda a domingo</small>${svg('chevron-right')}</button><button data-action="report-month"><span class="owner-menu-icon">${svg('chart')}</span><strong>Relatório mensal</strong><small>Vendas e sabores favoritos</small>${svg('chevron-right')}</button><button data-action="about"><span class="owner-menu-icon">${svg('store')}</span><strong>Informações da loja</strong><small>Horário e fidelidade</small>${svg('chevron-right')}</button></div><section class="owner-status"><h3>Cada pedido, no seu momento.</h3><div><span>${svg('receipt')}Recebido</span><span>${svg('clock')}Em preparo</span><span>${svg('truck')}Saiu para entrega</span><span>${svg('check')}Finalizado</span></div></section>${!orders.length?`<div class="owner-example"><p>Veja como fica a rotina da sua loja.</p><button class="secondary full" data-action="sample-orders">Carregar pedidos de exemplo ${svg('arrow')}</button></div>`:''}<p class="help-text owner-note">Apresentação da área do dono. Pedidos, caixa e mensagens são simulados e ficam neste navegador.</p>`;
 }
 function renderClub(){ $('club-content').innerHTML=loyaltyMarkup()+`<p class="help-text">Cartão demonstrativo do cliente, separado da área do dono.</p><button class="secondary full" data-action="choose">Voltar ao cardápio ${svg('arrow')}</button>`; }
 function statusAction(o){
  const next=R.nextStatus(o);if(!next)return '';
  const label=next==='preparando'?'Aceitar pedido':next==='entrega'?'Saiu para entrega':'Finalizar pedido';
- return `<button class="order-next ${next}" data-status="${next}" data-order="${esc(o.id)}">${svg(next==='preparando'?'clock':next==='entrega'?'truck':'check')}${label}</button>`;
+ return `<button class="order-next ${next}" data-status="${next}" data-order="${esc(o.id)}">${svg(next==='preparando'?'clock':next==='entrega'?'truck':'check')}${label}</button>${next!=='concluido'?`<button class="order-next concluido" data-status="concluido" data-order="${esc(o.id)}">${svg('check')}Finalizar pedido</button>`:''}`;
 }
 const statusBadge=o=>`<span class="status-badge ${o.status}">${states[o.status]||'Recebido'}</span>`;
 function orderCard(o,owner=false){
  return `<article class="order-card"><div class="order-top"><strong>${esc(o.id)}</strong>${statusBadge(o)}</div><p class="order-date">${date(o.date)}${o.reward?' · Resgate fidelidade':''}</p>${owner?`<h3 class="order-customer">${esc(o.customer.name||'Cliente da demonstração')}</h3>`:''}<div class="order-items">${o.lines.map(l=>`<p>${esc(l.label)}</p>`).join('')}</div><div class="order-foot"><span>${esc(o.delivery||'Retirada')} · ${esc(o.payment||'Pix')}</span><strong>${money(o.payableTotal??o.total)}</strong></div><div class="order-actions"><button data-detail="${o.id}" data-owner="${owner}">Ver detalhes ${svg('arrow')}</button>${owner?`<button class="print-button" data-print="${o.id}">${svg('printer')} Imprimir</button>${statusAction(o)}`:''}</div></article>`;
 }
 function renderOrders(){
- const own=orders.filter(o=>o.customer.id===profile.id);
+ const own=orders.filter(o=>o.customer.id===profile.id&&R.visibleOrder(o));
  const s=loyalty();
  $('orders-content').innerHTML=`<div class="mini-loyalty"><span>Seu cartão já tem <strong>${s.qualifying} ${s.qualifying===1?'pedido':'pedidos'}</strong></span><button data-action="club">Ver cartão</button></div>`+(own.length?own.map(o=>orderCard(o)).join(''):`<div class="empty-state"><span class="empty-icon">${svg('receipt')}</span><h3>Sua primeira combinação.</h3><p>Ao finalizar, seu pedido aparece aqui e no cartão fidelidade.</p>${LIVE&&cloudSession?.anonymous?'<p>Entre na sua conta para consultar pedidos de outro dispositivo.</p><button class="secondary full" data-action="account">Entrar na minha conta</button>':''}<button class="primary" data-action="choose">Escolher minha salada</button></div>`);
 }
 function renderAdmin(){
- const active=orders.filter(o=>o.status!=='cancelado'),q=normal($('admin-search').value);
- $('admin-stats').innerHTML=`<div><small>Todos os pedidos</small><strong>${orders.length}</strong></div><div><small>Em andamento</small><strong>${active.filter(o=>o.status!=='concluido').length}</strong></div><div><small>Vendas finalizadas</small><strong>${money(active.filter(o=>o.status==='concluido').reduce((n,o)=>n+(o.payableTotal??o.total),0))}</strong></div>`;
- const list=orders.filter(o=>(filter==='todos'||filter==='pendentes'&&['recebido','preparando','entrega'].includes(o.status)||o.status===filter)&&normal(o.id+' '+o.customer.name+' '+o.customer.phone).includes(q));
+ const visible=orders.filter(o=>R.visibleOrder(o)),active=visible.filter(o=>o.status!=='cancelado'),q=normal($('admin-search').value);
+ $('admin-stats').innerHTML=`<div><small>Todos os pedidos</small><strong>${visible.length}</strong></div><div><small>Em andamento</small><strong>${active.filter(o=>o.status!=='concluido').length}</strong></div><div><small>Vendas finalizadas</small><strong>${money(active.filter(o=>o.status==='concluido').reduce((n,o)=>n+(o.payableTotal??o.total),0))}</strong></div>`;
+ const list=visible.filter(o=>(filter==='todos'||filter==='pendentes'&&['recebido','preparando','entrega'].includes(o.status)||o.status===filter)&&normal(o.id+' '+o.customer.name+' '+o.customer.phone).includes(q));
  $('admin-content').innerHTML=list.length?list.map(o=>orderCard(o,true)).join(''):`<div class="empty-state"><span class="empty-icon">${svg('store')}</span><h3>${orders.length?'Nenhum pedido neste filtro':'Sua operação, organizada.'}</h3><p>${orders.length?'Experimente outra busca ou status.':'Carregue exemplos para conhecer os pedidos e acompanhar cada etapa.'}</p>${!orders.length?'<button class="primary" data-action="sample-orders">Carregar pedidos de exemplo</button>':''}</div>`;
  document.querySelectorAll('[data-filter]').forEach(b=>{const on=b.dataset.filter===filter;b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on));});
 }
@@ -364,7 +414,7 @@ function openDetail(id,owner){
  const o=orders.find(x=>x.id===id);if(!o||(!owner&&o.customer.id!==profile.id))return;detailOwner=owner;
  $('detail-title').textContent=o.id;
  $('detail-content').innerHTML=`<div class="order-top"><span class="order-date">${date(o.date)}</span>${statusBadge(o)}</div><section class="detail-section"><h3>Cliente</h3><p><b>${esc(o.customer.name||'Cliente da demonstração')}</b></p><p>${esc(o.customer.phone||'Telefone não informado')}</p></section><section class="detail-section"><h3>Seu pedido${o.reward?' · presente fidelidade':''}</h3>${itemDetails(o)}</section><section class="detail-section"><h3>Recebimento</h3><p>${esc(o.delivery)}</p><p>${esc(o.delivery==='Entrega'?o.address||'Não informado':'Local de retirada a combinar com a loja.')}</p>${o.delivery==='Entrega'&&o.neighborhood?`<p>Bairro: ${esc(o.neighborhood)}</p>`:''}${o.reference?`<p>Referência: ${esc(o.reference)}</p>`:''}</section><section class="detail-section"><h3>Pagamento</h3><p>${esc(o.payment+(o.cardType?' ('+o.cardType+')':''))}</p>${o.change?`<p>Troco para ${money(o.change)}</p>`:''}${o.delivery==='Entrega'?`<p>Taxa de entrega: ${money(o.deliveryFee||0)}</p>`:''}<p><small>Pagamento diretamente com a loja.</small></p></section><div class="detail-total"><span>Total do pedido</span><strong>${money(o.payableTotal??o.total)}</strong></div><p class="help-text">Demonstração. Nenhum pedido enviado à loja.</p>`;
- $('detail-actions').innerHTML=owner?`<div class="detail-actions full"><button class="secondary" data-action="admin">${svg('chevron-left')} Pedidos</button><button class="secondary" data-print="${o.id}">${svg('printer')} Imprimir</button>${statusAction(o)}${['recebido','preparando','entrega'].includes(o.status)?`<button class="text-button" data-status="cancelado" data-order="${o.id}">Cancelar pedido</button>`:''}</div>`:`<div class="detail-actions full">${!['cancelado','concluido'].includes(o.status)?`<a class="primary" href="${esc(whatsappOrderUrl(o))}">${svg('whatsapp')} WhatsApp</a>`:''}<button class="secondary" data-action="orders">Voltar aos meus pedidos</button></div>`;
+ $('detail-actions').innerHTML=owner?`<div class="detail-actions full"><button class="secondary" data-action="admin">${svg('chevron-left')} Pedidos</button><button class="secondary" data-print="${o.id}">${svg('printer')} Imprimir</button>${statusAction(o)}${['recebido','preparando','entrega'].includes(o.status)?`<button class="text-button" data-status="cancelado" data-order="${o.id}">Cancelar pedido</button>`:''}</div>`:`<div class="detail-actions full">${!['cancelado','concluido'].includes(o.status)?`<a class="primary" href="${esc(whatsappOrderUrl(o))}" target="_self" rel="noopener noreferrer" data-whatsapp-order="${esc(o.id)}">${svg('whatsapp')} WhatsApp</a>`:''}<button class="secondary" data-action="orders">Voltar aos meus pedidos</button></div>`;
  showDialog('detail-dialog');
 }
 function printMarkup(o){
@@ -423,6 +473,7 @@ function scrollToInfo(target){
 }
 function checkoutAddress(values){return String(values.get('address')||'').trim()+', '+String(values.get('houseNumber')||'').trim();}
 function resetCheckoutSteps(){
+ clearWhatsAppHandoff();
  $('checkout-submit-status').hidden=true;$('checkout-submit-status').textContent='';
  $('payment-step').hidden=true;$('payment-step').disabled=true;$('checkout-summary').hidden=true;
  $('go-to-payment').hidden=false;$('send-order').hidden=true;$('send-order').disabled=true;
@@ -555,6 +606,13 @@ $('go-to-payment').addEventListener('click',goToPayment);$('copy-pix').addEventL
 document.querySelectorAll('input[name="needsChange"]').forEach(i=>i.addEventListener('change',paymentFields));
 for(const id of ['customer-name','customer-phone','customer-neighborhood','customer-address','customer-number','customer-reference'])$(id).addEventListener('input',()=>{$(id).setCustomValidity('');if(!$('payment-step').hidden)resetCheckoutSteps();});
 $('start-checkout').addEventListener('click',startCheckout);$('checkout-form').addEventListener('submit',submitOrder);$('customer-neighborhood').addEventListener('change',deliveryFields);
+$('checkout-whatsapp').addEventListener('click',()=>beginWhatsAppHandoff(preparedWhatsAppOrder));
+document.addEventListener('click',e=>{const link=e.target.closest('[data-whatsapp-order]');if(link)beginWhatsAppHandoff(orders.find(item=>item.id===link.dataset.whatsappOrder));});
+$('loyalty-welcome-close').addEventListener('click',()=>$('loyalty-welcome').hidden=true);
+document.addEventListener('visibilitychange',()=>{if(document.hidden){whatsappReturn.leave();$('loyalty-welcome').hidden=true;}else if(!resumeWhatsAppReturn())updateLoyaltyUI();});
+window.addEventListener('pagehide',()=>whatsappReturn.leave());
+window.addEventListener('pageshow',()=>{if(!resumeWhatsAppReturn())updateLoyaltyUI();});
+window.addEventListener('focus',()=>{if(!resumeWhatsAppReturn())updateLoyaltyUI();});
 document.querySelectorAll('input[name="delivery"]').forEach(i=>i.addEventListener('change',deliveryFields));
 document.querySelectorAll('input[name="payment"]').forEach(i=>i.addEventListener('change',paymentFields));
 $('customer-name').addEventListener('input',()=>$('customer-name').setCustomValidity(''));

@@ -97,7 +97,7 @@ if(LIVE){
  openPrint=function(id){withKnownOrder(id,()=>baseOpenPrint(id));copyLive($('print-preview'));copyLive($('print-area'));};
  const baseOpenReportPrint=openReportPrint;openReportPrint=function(){baseOpenReportPrint();copyLive($('print-preview'));copyLive($('print-area'));};
  const baseOpenCashPrint=openCashPrint;openCashPrint=function(id){baseOpenCashPrint(id);copyLive($('print-preview'));copyLive($('print-area'));};
- const baseRenderClub=renderClub;renderClub=function(){baseRenderClub();$('club-content').querySelector('.help-text').textContent='Seu cartão fidelidade TropiSertão. Cada pedido elegível aproxima você do próximo presente.';};
+ const baseRenderClub=renderClub;renderClub=function(){baseRenderClub();$('club-content').querySelector('.help-text').textContent='Cada pedido finalizado pela loja vale um ponto. Pedidos aguardando atendimento não contam.';};
  const baseStartCheckout=startCheckout;startCheckout=async function(){try{await CLOUD.ready;baseStartCheckout();}catch(e){cloudError(e);}};
  submitOrder=async function(e){
   e.preventDefault();if(submitting||!validateCheckoutPayment())return;
@@ -120,13 +120,12 @@ if(LIVE){
    save('tropisertao-live-checkout-key',pending);
    const result=await CLOUD.createOrder({...data,requestKey:pending.key}),order=result.order;
    if(order.customer.id!==cloudSession?.uid){status.textContent='Pedido registrado na conta anterior. Entre nela para acompanhar.';status.hidden=false;toast(status.textContent);return;}
+   if(order.status==='cancelado'||order.expired){localStorage.removeItem('tropisertao-live-checkout-key');status.textContent='O pedido anterior não está mais ativo. Toque novamente para preparar um novo pedido.';status.hidden=false;return;}
    const whatsappUrl=whatsappOrderUrl(order);
    cloudLoyalty=result.loyalty;profile={id:order.customer.id,name:order.customer.name,phone:order.customer.phone};
    orders=[order,...orders.filter(o=>o.id!==order.id)];
+   loyaltyReady=true;updateLoyaltyUI();
    finishWhatsAppHandoff(order,whatsappUrl);
-   cart=[];updateCart();
-   localStorage.removeItem('tropisertao-live-checkout-key');$('checkout-form').reset();deliveryFields();paymentFields();
-   $('success-loyalty').innerHTML=loyaltyMarkup(!order.reward);
   }catch(error){status.textContent=cloudError(error);status.hidden=false;}finally{submitting=false;button.innerHTML=buttonContent;button.removeAttribute('aria-busy');button.disabled=!$('checkout-form').elements.payment.value;}
  };
  cashFormSubmit=async function(e){
@@ -167,26 +166,35 @@ if(LIVE){
   }catch(error){cloudError(error);}finally{buttons.forEach(b=>b.disabled=false);}
  });
  const checkoutButton=$('checkout-form').querySelector('[type="submit"]');
- checkoutButton.innerHTML=svg('check')+' Confirmar pedido';
+ checkoutButton.innerHTML=svg('whatsapp')+' Continuar para WhatsApp';
  $('customer-phone').required=true;
  CLOUD.start({
   onSession(session){
    if(cloudSession?.uid!==session?.uid||cloudSession?.owner!==session?.owner){
-    for(const id of ['admin-dialog','report-dialog','cash-dialog','detail-dialog','print-dialog','success-dialog','club-dialog','orders-dialog'])if($(id).open)$(id).close();
+    for(const id of ['admin-dialog','report-dialog','cash-dialog','detail-dialog','print-dialog','success-dialog','club-dialog','orders-dialog','checkout-dialog'])if($(id).open)$(id).close();
     for(const id of ['admin-content','report-content','cash-content','detail-content','detail-actions','print-preview','print-area','success-receipt','success-loyalty','orders-content','club-content'])$(id).innerHTML='';
     $('success-whatsapp-footer').hidden=true;$('success-whatsapp').removeAttribute('href');
+    clearWhatsAppHandoff();returnedOrderId=null;welcomeCount=-1;$('loyalty-welcome').hidden=true;
+    if(!document.querySelector('dialog[open]'))document.body.style.overflow='';
     detailOwner=false;
    }
    cloudSession=session;connection=null;reports.clear();reportRequest++;
-   profile={id:session?.uid||'',name:'',phone:''};cloudLoyalty=null;refreshVisible();
+   profile={id:session?.uid||'',name:'',phone:''};cloudLoyalty=null;loyaltyReady=false;refreshVisible();updateLoyaltyUI();
+   if(session&&!session.owner)CLOUD.getLoyalty().then(value=>{
+    if(cloudSession?.uid!==session.uid)return;
+    if(!loyaltyReady)cloudLoyalty=value.loyalty;
+    loyaltyReady=true;refreshVisible();if(!resumeWhatsAppReturn())updateLoyaltyUI();
+   }).catch(cloudError);
    if(session?.owner)CLOUD.connection().then(value=>{if(cloudSession?.uid!==session.uid||!owner())return;connection=value;if($('account-dialog').open)renderAccount();}).catch(cloudError);
   },
-  onOrders(value){orders=value;refreshVisible();},
+  onOrders(value){orders=value;refreshVisible();if(!resumeWhatsAppReturn())updateLoyaltyUI();},
   onCash(value){cashSessions=value;if($('cash-dialog').open){renderCash();copyLive($('cash-dialog'));}},
-  onProfile(value){if(value){profile={id:value.id,name:value.name||'',phone:value.phone||''};const counts=value.loyalty||{};
-   const qualifying=counts.qualifying||0,redeemed=counts.redeemed||0,earned=Math.floor(qualifying/10),available=Math.max(0,earned-redeemed),rest=qualifying%10;
-   cloudLoyalty={qualifying,redeemed,earned,available,stamps:rest===0&&available>0?10:rest,remaining:10-rest};
-  }else cloudLoyalty=null;if($('club-dialog').open)renderClub();},
+  onProfile(value){if(value){profile={id:cloudSession?.uid||'',name:value.name||'',phone:value.phone||''};const counts=value.loyalty||{};
+   if(counts.version===2){
+    const qualifying=counts.qualifying||0,redeemed=counts.redeemed||0,reserved=counts.reserved||0,earned=Math.floor(qualifying/10),available=Math.max(0,earned-redeemed-reserved),rest=qualifying%10;
+    cloudLoyalty={qualifying,redeemed,reserved,earned,available,stamps:rest===0&&earned>redeemed?10:rest,remaining:10-rest};loyaltyReady=true;
+   }else cloudLoyalty=null;
+  }else cloudLoyalty=null;if($('club-dialog').open)renderClub();if(!resumeWhatsAppReturn())updateLoyaltyUI();},
   onError:cloudError
  });
  copyLive(document.body);

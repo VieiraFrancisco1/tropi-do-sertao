@@ -44,6 +44,8 @@ test('opt-in is explicit, rather than inferred from a phone number', () => {
 test('loyalty consumes one previously earned gift', () => {
   assert.equal(loyalty({ qualifying: 10, redeemed: 0 }).available, 1);
   assert.equal(loyalty({ qualifying: 10, redeemed: 1 }).available, 0);
+  assert.equal(loyalty({ qualifying: 10, redeemed: 0, reserved: 1 }).available, 0);
+  assert.equal(loyalty({ qualifying: 10, redeemed: 0, reserved: 1 }).stamps, 10);
 });
 test('administrative role must be an actual server boolean', () => {
   assert.throws(() => requireUser({ uid: 'customer', admin: 'true' }, true), /exclusiva/);

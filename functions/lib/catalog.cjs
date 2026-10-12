@@ -43,8 +43,11 @@ function lineLabel(l){
  const p=product(l.productId);return l.qty+'× '+lineTitle(l)+(p?.kind==='combo'?' · '+lineDescription(l):l.extras.length?' + '+lineDescription(l):'');
 }
 const STATUS_LABELS=Object.freeze({recebido:'Recebido',preparando:'Em preparo',entrega:'Saiu para entrega',concluido:'Finalizado',cancelado:'Cancelado'});
+const PENDING_REQUEST_TTL=24*60*60*1000;
+const pendingExpired=(order,at=Date.now())=>order?.status==='recebido'&&Number.isFinite(order.date)&&at>=(order.expiresAt||order.date+PENDING_REQUEST_TTL);
+const visibleOrder=(order,at=Date.now())=>!!order&&!order.expired&&!pendingExpired(order,at);
 const nextStatus=o=>o.status==='recebido'?'preparando':o.status==='preparando'?(o.delivery==='Entrega'?'entrega':'concluido'):o.status==='entrega'?'concluido':null;
-const canTransition=(o,status)=>!!o&&(status===nextStatus(o)||status==='cancelado'&&['recebido','preparando','entrega'].includes(o.status));
+const canTransition=(o,status)=>!!o&&(status===nextStatus(o)||['cancelado','concluido'].includes(status)&&['recebido','preparando','entrega'].includes(o.status));
 function periodKey(timestamp,period='day'){
   const value=new Date(timestamp);if(!Number.isFinite(value.getTime()))return '';
   const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Fortaleza',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(value);
@@ -119,12 +122,13 @@ function closeCashSession(session,{countedCents,at}){
 }
 function loyaltyState(orders,customerId){
   const seen=new Set();
-  const own=orders.filter(o=>o&&o.customer&&o.customer.id===customerId&&o.status!=='cancelado'&&!seen.has(o.id)&&seen.add(o.id));
-  const qualifying=own.filter(o=>!o.reward&&o.total>0).length;
-  const redeemed=own.filter(o=>o.reward||o.redeemsReward).length;
-  const earned=Math.floor(qualifying/10),available=Math.max(0,earned-redeemed);
-  const remainder=qualifying%10,stamps=remainder===0&&available>0?10:remainder;
-  return {qualifying,redeemed,earned,available,stamps,remaining:10-remainder};
+  const own=orders.filter(o=>o&&o.customer&&o.customer.id===customerId&&!o.expired&&o.status!=='cancelado'&&!seen.has(o.id)&&seen.add(o.id));
+  const qualifying=own.filter(o=>o.status==='concluido'&&!o.reward&&o.total>0).length;
+  const redeemed=own.filter(o=>o.status==='concluido'&&(o.reward||o.redeemsReward)).length;
+  const reserved=own.filter(o=>['recebido','preparando','entrega'].includes(o.status)&&(o.reward||o.redeemsReward)).length;
+  const earned=Math.floor(qualifying/10),available=Math.max(0,earned-redeemed-reserved);
+  const remainder=qualifying%10,stamps=remainder===0&&earned>redeemed?10:remainder;
+  return {qualifying,redeemed,reserved,earned,available,stamps,remaining:10-remainder};
 }
 function validateCheckout(lines,loyalty){
   if(!lines.length||!lines.every(validLine))return 'Revise os itens da sua sacola.';
@@ -134,7 +138,7 @@ function validateCheckout(lines,loyalty){
   if(paid.length&&cartTotal(paid)<500)return 'O pedido mínimo é R$ 5,00.';
   return '';
 }
-root.TropiRules=Object.freeze({STORE,deliveryFeeCents,PRODUCTS,JUICES,EXTRAS,product,extra,validLine,unitPrice,cartTotal,lineTitle,lineDescription,lineLabel,STATUS_LABELS,nextStatus,canTransition,periodKey,periodBounds,orderReport,parseMoney,openCashSession,cashSummary,bookCashSale,cashMovement,closeCashSession,loyaltyState,validateCheckout});
+root.TropiRules=Object.freeze({STORE,deliveryFeeCents,PRODUCTS,JUICES,EXTRAS,product,extra,validLine,unitPrice,cartTotal,lineTitle,lineDescription,lineLabel,STATUS_LABELS,PENDING_REQUEST_TTL,pendingExpired,visibleOrder,nextStatus,canTransition,periodKey,periodBounds,orderReport,parseMoney,openCashSession,cashSummary,bookCashSale,cashMovement,closeCashSession,loyaltyState,validateCheckout});
 })(typeof window==='undefined'?globalThis:window);
 
 module.exports = globalThis.TropiRules;

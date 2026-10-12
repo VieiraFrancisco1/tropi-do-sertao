@@ -56,6 +56,7 @@ window.TropiCloud = {
   },
   async logout() { stop(); await signOut(auth); },
   createOrder: data => call('createOrder', data),
+  getLoyalty: () => call('getLoyalty', {}),
   updateStatus: data => call('updateOrderStatus', data),
   cashAction: data => call('cashAction', data),
   report: data => call('getOrderReport', data),

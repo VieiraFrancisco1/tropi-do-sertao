@@ -5,9 +5,11 @@ const R = globalThis.TropiRules;
 const line = {productId:'500', extras:['ninho','morango'], qty:2, reward:false};
 assert.equal(R.unitPrice(line),1900);
 assert.equal(R.cartTotal([line]),3800);
-const paid = (id, extra={}) => ({id, customer:{id:'cliente'}, total:1200, status:'recebido', reward:false, ...extra});
+const paid = (id, extra={}) => ({id, customer:{id:'cliente'}, total:1200, status:'concluido', reward:false, ...extra});
 const ten = Array.from({length:10},(_,i)=>paid(String(i)));
-assert.deepEqual(R.loyaltyState(ten,'cliente'),{qualifying:10,redeemed:0,earned:1,available:1,stamps:10,remaining:10});
+assert.deepEqual(R.loyaltyState(ten,'cliente'),{qualifying:10,redeemed:0,reserved:0,earned:1,available:1,stamps:10,remaining:10});
+assert.equal(R.loyaltyState(ten.map(o=>({...o,status:'recebido'})),'cliente').qualifying,0);
+assert.equal(R.loyaltyState(ten.map(o=>({...o,status:'preparando'})),'cliente').qualifying,0);
 assert.equal(R.loyaltyState([...ten,ten[0]],'cliente').qualifying,10);
 assert.equal(R.loyaltyState([...ten,paid('outro',{customer:{id:'outra'}})],'cliente').qualifying,10);
 const gift = paid('presente',{total:0,reward:true,redeemsReward:true});
@@ -59,7 +61,7 @@ assert.equal(R.orderReport(samples,{period:'month',value:'2026-10'}).totalCents,
 assert.equal(R.orderReport(samples,{period:'month',value:'2026-09'}).totalCents,3000);
 assert.equal(R.orderReport(samples,{value:'2026-10-07'}).ticketCents,0);
 const delivery=operation('delivery','recebido',1600,'2026-10-06T12:00:00Z');
-assert.equal(R.canTransition(delivery,'concluido'),false);
+assert.equal(R.canTransition(delivery,'concluido'),true);
 for(const expected of ['preparando','entrega','concluido']){
  assert.equal(R.nextStatus(delivery),expected);assert.equal(R.canTransition(delivery,expected),true);delivery.status=expected;
 }

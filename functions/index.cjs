@@ -37,6 +37,8 @@ exports.createOrder = callable(service.createOrder);
 exports.updateOrderStatus = callable(service.updateStatus);
 exports.cashAction = callable(service.cashAction);
 exports.getOrderReport = callable(service.report);
+exports.getLoyalty = callable(service.getLoyalty);
+exports.expirePendingOrders = onSchedule({ schedule: 'every 15 minutes', timeZone: 'America/Fortaleza', maxInstances: 1 }, () => service.expirePending());
 exports.getStoreConnection = callable(async user => { requireUser(user, true); return { whatsappEnabled: !coreOnly && enabled.value() }; });
 function whatsapp({ sender = false, receiver = false } = {}) {
   return createWhatsApp({ db, config: () => ({

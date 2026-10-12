@@ -16,42 +16,41 @@ assert.ok(handoffCode.startsWith('function finishWhatsAppHandoff('));
 assert.ok(submitCode.includes('submitOrder=async function(e){'));
 
 function deferred(){let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};}
-const result=()=>({order:{id:'TROPI-321',date:Date.parse('2026-10-12T03:00:00Z'),status:'recebido',customer:{id:'buyer',name:'Cliente de teste',phone:'5588999999999'},delivery:'Retirada',payment:'Pix',total:700,payableTotal:700,lines:[{productId:'suco-laranja',qty:1,extras:[],notes:'',subtotal:700}]},loyalty:{qualifying:1,available:0,stamps:1}});
+const result=()=>({order:{id:'TROPI-321',date:Date.parse('2026-10-12T03:00:00Z'),status:'recebido',customer:{id:'buyer',name:'Cliente de teste',phone:'5588999999999'},delivery:'Retirada',payment:'Pix',total:700,payableTotal:700,lines:[{productId:'suco-laranja',qty:1,extras:[],notes:'',subtotal:700}]},loyalty:{qualifying:0,available:0,stamps:0}});
 
 function handoffHarness(){
  const nodes=new Map(),events={urls:[],dialogs:[],toasts:[],popups:0,focus:0};
- nodes.set('success-title',{nextElementSibling:{textContent:''}});
- nodes.set('success-receipt',{});
- nodes.set('success-whatsapp-footer',{hidden:true});
- nodes.set('success-whatsapp',{target:'_self',focus(options){assert.equal(options.preventScroll,true);events.focus++;}});
+ nodes.set('checkout-submit-status',{hidden:true,textContent:'',classList:{add(){}}});
+ nodes.set('send-order',{hidden:false});
+ nodes.set('checkout-whatsapp',{target:'_self',focus(options){assert.equal(options.preventScroll,true);events.focus++;}});
  const window={open(){events.popups++;throw new Error('Popup blocked');},location:{assign:url=>events.urls.push(url)}};
- const finish=new Function('$','window','whatsappOrderUrl','showDialog','esc','money',handoffCode+';return finishWhatsAppHandoff;')(id=>nodes.get(id),window,makeUrl,id=>events.dialogs.push(id),String,money);
+ const finish=new Function('$','window','whatsappOrderUrl','showDialog','esc','money','let preparedWhatsAppOrder=null,preparedCart="",cart=[];'+handoffCode+';return finishWhatsAppHandoff;')(id=>nodes.get(id),window,makeUrl,id=>events.dialogs.push(id),String,money);
  return{finish,nodes,events};
 }
 
-test('o envio é um link nativo pronto para um novo toque, sem redirecionamento após a espera',()=>{
+test('preparar o link mantém o checkout, sem abrir confirmação ou atribuir pontos',()=>{
  const h=handoffHarness(),order=result().order;
  h.finish(order);
  assert.equal(h.events.popups,0);
  assert.deepEqual(h.events.urls,[]);
- assert.deepEqual(h.events.dialogs,['success-dialog']);
- assert.equal(h.nodes.get('success-whatsapp-footer').hidden,false);
- assert.equal(h.nodes.get('success-whatsapp').href,makeUrl(order));
- assert.equal(h.nodes.get('success-whatsapp').target,'_self');
- assert.ok(new URL(h.nodes.get('success-whatsapp').href).searchParams.get('text').includes(order.id));
- assert.match(h.nodes.get('success-receipt').innerHTML,/TROPI-321/);
- assert.match(h.nodes.get('success-title').nextElementSibling.textContent,/mensagem pronta/);
+ assert.deepEqual(h.events.dialogs,[]);
+ assert.equal(h.nodes.get('checkout-whatsapp').hidden,false);
+ assert.equal(h.nodes.get('send-order').hidden,true);
+ assert.equal(h.nodes.get('checkout-whatsapp').href,makeUrl(order));
+ assert.equal(h.nodes.get('checkout-whatsapp').target,'_self');
+ assert.ok(new URL(h.nodes.get('checkout-whatsapp').href).searchParams.get('text').includes(order.id));
+ assert.match(h.nodes.get('checkout-submit-status').textContent,/Envie sua mensagem/);
  assert.equal(h.events.focus,1);
 });
 
-test('reabrir a confirmação usa o mesmo pedido e substitui o link da compra anterior',()=>{
+test('preparar novamente usa o mesmo pedido e substitui o link da compra anterior',()=>{
  const h=handoffHarness(),order=result().order;
  h.finish(order);
  h.finish({...order,id:'TROPI-322'});
- const message=new URL(h.nodes.get('success-whatsapp').href).searchParams.get('text');
+ const message=new URL(h.nodes.get('checkout-whatsapp').href).searchParams.get('text');
  assert.ok(message.includes('TROPI-322'));
  assert.ok(!message.includes('TROPI-321'));
- assert.equal(h.nodes.get('success-whatsapp-footer').hidden,false);
+ assert.equal(h.nodes.get('checkout-whatsapp').hidden,false);
  assert.deepEqual(h.events.urls,[]);
 });
 
@@ -66,10 +65,10 @@ function submitHarness(createOrder,{sessionUid='buyer'}={}){
   read:(key,fallback)=>stored.get(key)??fallback,save:(key,value)=>stored.set(key,value),localStorage:{removeItem:key=>stored.delete(key)},
   uid:()=> 'test-request-key-00001',loyalty:()=>({available:0}),validateCheckoutPayment:()=>true,checkoutAddress:()=>'',
   svg:()=>'',esc:String,money,loyaltyMarkup:()=>'',updateCart:()=>{},deliveryFields:()=>{},paymentFields:()=>{},
-  finishWhatsAppHandoff:(order,url)=>events.handoffs.push({order,url}),whatsappOrderUrl:makeUrl,
+  updateLoyaltyUI:()=>{},finishWhatsAppHandoff:(order,url)=>events.handoffs.push({order,url}),whatsappOrderUrl:makeUrl,
   cloudError:error=>{events.errors.push(error);return 'Confira sua conexão e tente novamente.';},toast:message=>events.toasts.push(message),
   inputCart:[{productId:'suco-laranja',qty:1,extras:[],reward:false,notes:''}]};
- const harness=new Function('deps',`const {R,$,CLOUD,crypto,FormData,cloudSession,read,save,localStorage,uid,loyalty,validateCheckoutPayment,checkoutAddress,svg,esc,money,loyaltyMarkup,updateCart,deliveryFields,paymentFields,finishWhatsAppHandoff,whatsappOrderUrl,cloudError,toast,inputCart}=deps;let submitOrder,submitting=false,cart=inputCart,orders=[],profile={},cloudLoyalty=null;${submitCode};return {submit:submitOrder,state:()=>({submitting,cart,orders,profile})};`)(deps);
+ const harness=new Function('deps',`const {R,$,CLOUD,crypto,FormData,cloudSession,read,save,localStorage,uid,loyalty,validateCheckoutPayment,checkoutAddress,svg,esc,money,loyaltyMarkup,updateCart,deliveryFields,paymentFields,updateLoyaltyUI,finishWhatsAppHandoff,whatsappOrderUrl,cloudError,toast,inputCart}=deps;let submitOrder,submitting=false,cart=inputCart,orders=[],profile={},cloudLoyalty=null,loyaltyReady=false;${submitCode};return {submit:submitOrder,state:()=>({submitting,cart,orders,profile})};`)(deps);
  return{...harness,events,stored,button,status:nodes['checkout-submit-status'],event:{currentTarget:form,preventDefault(){}}};
 }
 
@@ -90,7 +89,7 @@ test('aguarda o registro e impede dois cliques antes de abrir a conversa',async(
  assert.equal(h.events.handoffs.length,1);
  assert.equal(h.events.handoffs[0].order.id,'TROPI-321');
  assert.equal(h.events.handoffs[0].url,makeUrl(result().order));
- assert.equal(h.state().cart.length,0);
+ assert.equal(h.state().cart.length,1);
  assert.equal(h.state().orders.length,1);
  assert.equal(h.state().submitting,false);
  assert.equal(h.button.attributes.has('aria-busy'),false);
@@ -112,7 +111,7 @@ test('uma falha conserva a sacola e a nova tentativa usa a mesma identificação
  await h.submit(h.event);
  assert.equal(h.events.requests[0].requestKey,h.events.requests[1].requestKey);
  assert.equal(h.events.handoffs.length,1);
- assert.equal(h.stored.has('tropisertao-live-checkout-key'),false);
+ assert.equal(h.stored.has('tropisertao-live-checkout-key'),true);
  assert.equal(h.status.hidden,true);
 });
 

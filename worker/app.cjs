@@ -4,7 +4,7 @@ const {verifyFirebaseToken,verifyAppCheck}=require('./auth.cjs');
 const {createService}=require('../functions/lib/service.cjs');
 const {createWhatsApp}=require('../functions/lib/whatsapp.cjs');
 const {requireUser,AppError,digest}=require('../functions/lib/domain.cjs');
-const ROUTES={createOrder:'createOrder',updateOrderStatus:'updateStatus',cashAction:'cashAction',getOrderReport:'report',getStoreConnection:'connection'};
+const ROUTES={createOrder:'createOrder',updateOrderStatus:'updateStatus',cashAction:'cashAction',getOrderReport:'report',getStoreConnection:'connection',getLoyalty:'getLoyalty'};
 const codeToStatus={'invalid-argument':400,unauthenticated:401,'permission-denied':403,'not-found':404,'failed-precondition':409,aborted:409,'resource-exhausted':429};
 const json=(value,status=200,headers={})=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...headers}});
 function configure(env, dependency={}) {
@@ -79,6 +79,6 @@ function configure(env, dependency={}) {
       return json({error:'Não foi possível concluir. Tente novamente.',code:'internal'},500,headers);
     }
   }
-  return {handle,scheduled:()=>whatsapp.retryDue(),db};
+  return {handle,async scheduled(){await service.expirePending();if(enabled)await whatsapp.retryDue();},db};
 }
 module.exports={configure};

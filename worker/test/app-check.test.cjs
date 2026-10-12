@@ -47,16 +47,7 @@ test('a indisponibilidade das chaves não libera um token sem verificar a assina
  await assert.rejects(verifyAppCheck(token({header:{kid:'unknown-key'}}),appId,{fetchImpl:async()=>new Response('',{status:503}),now:()=>at}),/signing keys unavailable/);
 });
 
-function memoryDb(){
- const store=new Map();
- return {store,doc:path=>({path}),async runTransaction(action){
-  const writes=[];
-  const tx={get:async ref=>({exists:store.has(ref.path),data:()=>store.has(ref.path)?structuredClone(store.get(ref.path)):undefined}),
-   create:(ref,data)=>writes.push(()=>{assert.equal(store.has(ref.path),false);store.set(ref.path,structuredClone(data));}),
-   set:(ref,data,options)=>writes.push(()=>store.set(ref.path,options?.merge?{...structuredClone(store.get(ref.path)||{}),...structuredClone(data)}:structuredClone(data)))};
-  const result=await action(tx);for(const write of writes)write();return result;
- }};
-}
+const {memoryDb}=require('../../functions/test/memory-db.cjs');
 
 test('o pedido percorre login assinado, App Check, preços e registro sem uma permissão extra de consumo',async t=>{
  const identity=crypto.generateKeyPairSync('rsa',{modulusLength:2048});

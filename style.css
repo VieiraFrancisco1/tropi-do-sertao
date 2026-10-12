@@ -209,3 +209,13 @@ html{scrollbar-width:none}html::-webkit-scrollbar{display:none}.sheet-scroll{scr
 .pix-recipient{font-size:12px;color:#5b714e;line-height:1.5;margin:0 0 13px;overflow-wrap:anywhere}.pix-recipient:empty{display:none}
 
 .checkout-actions{flex-direction:column;align-items:stretch}.checkout-submit-status{margin:0;font-size:12px;line-height:1.4;color:#9f3939;overflow-wrap:anywhere}
+.checkout-submit-status.is-ready{color:var(--green)}
+.loyalty-badge{display:inline-grid;place-items:center;min-width:17px;height:17px;padding:0 4px;border-radius:20px;background:#d4ff64;color:#174c34;font-size:10px;line-height:1;font-weight:800;flex-shrink:0}
+.loyalty-welcome{position:fixed;left:50%;bottom:88px;transform:translateX(-50%);width:min(340px,calc(100% - 32px));z-index:46;border:1px solid #ff991f;border-radius:15px;background:linear-gradient(125deg,#1c5c3c,#103e2e);color:#fffbed;box-shadow:0 8px 28px #174c3433;animation:loyaltyWelcome .4s ease-out}
+.loyalty-welcome-card{display:flex;flex-direction:column;gap:7px;text-align:left;width:100%;padding:15px 19px;color:inherit}
+.loyalty-welcome-card small{font-size:9px;letter-spacing:1.1px;color:#d4ff8f}.loyalty-welcome-card strong{font-size:16px;line-height:1.3;padding-right:12px}.loyalty-welcome-card>span:last-child{display:flex;align-items:center;gap:7px;font-size:11px;color:#e1f5bb}.loyalty-welcome-card>span:last-child svg{width:15px;height:15px}
+.welcome-stamps{display:grid;grid-template-columns:repeat(10,1fr);gap:5px}.welcome-stamps i{border:1px dashed #c4e59666;border-radius:50%;aspect-ratio:1;display:grid;place-items:center}.welcome-stamps i.checked{background:#bfff57;border:1px solid #bfff57;color:#194c34}.welcome-stamps svg{width:15px;height:15px}
+.loyalty-welcome-close{position:absolute;top:7px;right:7px;display:grid;place-items:center;width:25px;height:25px;border-radius:50%;color:#d7edc2}.loyalty-welcome-close svg{width:15px;height:15px}
+.success-sheet.is-pending .success-burst{display:none}.success-sheet.is-pending h2{animation:none;margin-top:8px}.success-sheet.is-pending .sheet-scroll>p{animation:none;font-size:13px}
+@keyframes loyaltyWelcome{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+@media(max-width:700px){.loyalty-welcome{bottom:calc(88px + env(safe-area-inset-bottom))}.cart-peek:not([hidden])~.loyalty-welcome{bottom:calc(148px + env(safe-area-inset-bottom))}}

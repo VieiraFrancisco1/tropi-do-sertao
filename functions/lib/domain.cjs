@@ -54,9 +54,9 @@ function sanitizeCheckout(input) {
   };
 }
 function loyalty(counts = {}) {
-  const qualifying = Math.max(0, counts.qualifying || 0), redeemed = Math.max(0, counts.redeemed || 0);
-  const earned = Math.floor(qualifying / 10), available = Math.max(0, earned - redeemed), rest = qualifying % 10;
-  return { qualifying, redeemed, earned, available, stamps: rest === 0 && available > 0 ? 10 : rest, remaining: 10 - rest };
+  const qualifying = Math.max(0, counts.qualifying || 0), redeemed = Math.max(0, counts.redeemed || 0), reserved = Math.max(0,counts.reserved||0);
+  const earned = Math.floor(qualifying / 10), available = Math.max(0, earned - redeemed - reserved), rest = qualifying % 10;
+  return { version:2,qualifying, redeemed, reserved, earned, available, stamps: rest === 0 && earned>redeemed ? 10 : rest, remaining: 10 - rest };
 }
 function verifySignature(rawBody, signature, secret) {
   if (!Buffer.isBuffer(rawBody) || !secret || !/^sha256=[0-9a-f]{64}$/i.test(signature || '')) return false;

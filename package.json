@@ -8,7 +8,7 @@
   "scripts": {
     "build": "node scripts/build.mjs --mode demo",
     "build:firebase": "node scripts/build.mjs --mode firebase",
-    "test": "node logic.test.js && node --test functions/test/unit.test.cjs",
+    "test": "node logic.test.js && node --test functions/test/unit.test.cjs functions/test/loyalty.test.cjs",
     "test:integration": "firebase emulators:exec --project demo-tropisertao --only firestore,auth \"node --test functions/test/integration.test.cjs\"",
     "emulators": "node scripts/emulators.mjs",
     "deploy": "node scripts/deploy.mjs",

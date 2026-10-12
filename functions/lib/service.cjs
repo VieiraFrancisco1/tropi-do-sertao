@@ -2,6 +2,58 @@
 const { R, fail, digest, requireUser, key, orderId, text, sanitizeCheckout, loyalty } = require('./domain.cjs');
 const OPT_IN_TEXT = 'Quero receber no WhatsApp atualizações da TropiSertão sobre o preparo e a entrega deste pedido. Posso parar respondendo SAIR.';
 function createService({ db, clock = Date.now, whatsappEnabled = () => false }) {
+  async function ensureLoyalty(uid) {
+    const ref = db.doc('customers/' + uid), existing = await ref.get();
+    if (!existing.exists || existing.data().loyalty?.version === 2) return;
+    // Rebuild the old counters from completed orders, once per customer. A
+    // request created in the old checkout is not proof of a completed sale.
+    const snapshot = await db.collection('orders').where('customer.id', '==', uid).get();
+    const own = snapshot.docs.map(doc => doc.data()).filter(order => !order.expired);
+    const completed = own.filter(order => order.status === 'concluido');
+    const counts = { version: 2,
+      qualifying: completed.filter(order => !order.reward && order.total > 0).length,
+      redeemed: completed.filter(order => order.reward || order.redeemsReward).length,
+      reserved: own.filter(order => ['recebido', 'preparando', 'entrega'].includes(order.status) && (order.reward || order.redeemsReward)).length };
+    const waiting = own.filter(order => order.status === 'recebido').sort((a, b) => b.date - a.date);
+    const pending = waiting.find(order => !R.pendingExpired(order, clock())) || waiting[0];
+    await db.runTransaction(async tx => {
+      const current = await tx.get(ref);
+      if (!current.exists || current.data().loyalty?.version === 2) return;
+      tx.set(ref, { loyalty: counts, pendingOrderId: pending?.id || null, updatedAt: clock() }, { merge: true });
+    });
+  }
+  async function expireOrder(id) {
+    const ref = db.doc('orders/' + id), initial = await ref.get();
+    if (!initial.exists || !R.pendingExpired(initial.data(), clock())) return false;
+    await ensureLoyalty(initial.data().customer.id);
+    return db.runTransaction(async tx => {
+      const snapshot = await tx.get(ref), order = snapshot.data(), at = clock();
+      if (!snapshot.exists || !R.pendingExpired(order, at)) return false;
+      const customerRef = db.doc('customers/' + order.customer.id), customer = await tx.get(customerRef);
+      const counts = loyalty(customer.data()?.loyalty);
+      const update = { updatedAt: at, loyalty: { version: 2, qualifying: counts.qualifying, redeemed: counts.redeemed,
+        reserved: Math.max(0, counts.reserved - (order.reward || order.redeemsReward ? 1 : 0)) } };
+      if (customer.data()?.pendingOrderId === id) update.pendingOrderId = null;
+      tx.set(customerRef, update, { merge: true });
+      tx.set(ref, { ...order, status: 'cancelado', expired: true, updatedAt: at,
+        statusHistory: [...(order.statusHistory || []), { status: 'cancelado', at, actor: 'system', reason: 'Sem confirmação da loja em 24 horas' }] });
+      return true;
+    });
+  }
+  async function getLoyalty(user) {
+    requireUser(user);
+    await ensureLoyalty(user.uid);
+    const ref = db.doc('customers/' + user.uid);
+    const customer = await ref.get(), pendingId = customer.data()?.pendingOrderId;
+    if (pendingId) await expireOrder(pendingId);
+    return { loyalty: loyalty((pendingId ? await ref.get() : customer).data()?.loyalty) };
+  }
+  async function expirePending() {
+    const snapshot = await db.collection('orders').where('status', '==', 'recebido').limit(40).get();
+    let expired = 0;
+    for (const doc of snapshot.docs) if (R.pendingExpired(doc.data(), clock()) && await expireOrder(doc.id)) expired++;
+    return { expired };
+  }
   async function createOrder(user, input) {
     requireUser(user);
     const data = sanitizeCheckout(input), at = clock();
@@ -9,11 +61,19 @@ function createService({ db, clock = Date.now, whatsappEnabled = () => false }) 
     const customerRef = db.doc('customers/' + user.uid), counter = db.doc('controls/orderCounter');
     const rateRef = db.doc('orderRateLimits/' + user.uid), recipient = db.doc('whatsappRecipients/' + digest(data.phone));
     const ipRateRef = user.ipHash ? db.doc('orderIpRateLimits/' + user.ipHash) : null;
+    await getLoyalty(user);
     return db.runTransaction(async tx => {
       const prior = await tx.get(request);
-      if (prior.exists) return { order: prior.data().order, loyalty: prior.data().loyalty, duplicate: true };
+      if (prior.exists) {
+        const [currentOrder, customer] = await Promise.all([tx.get(db.doc('orders/' + prior.data().order.id)), tx.get(customerRef)]);
+        return { order: currentOrder.data() || prior.data().order, loyalty: loyalty(customer.data()?.loyalty), duplicate: true };
+      }
       const [c, n, r, ipR] = await Promise.all([tx.get(customerRef), tx.get(counter), tx.get(rateRef), ipRateRef ? tx.get(ipRateRef) : Promise.resolve(null)]);
       const counts = c.data()?.loyalty || {}, available = loyalty(counts);
+      if (c.data()?.pendingOrderId) {
+        const waiting = await tx.get(db.doc('orders/' + c.data().pendingOrderId));
+        if (waiting.exists && waiting.data().status === 'recebido') fail('failed-precondition', 'Você já tem um pedido aguardando a loja. Confira Meus pedidos.');
+      }
       const checkoutError = R.validateCheckout(data.lines, available);
       if (checkoutError) fail('failed-precondition', checkoutError);
       const rate = r.data(), inWindow = rate && at - rate.startedAt < 600000;
@@ -23,16 +83,16 @@ function createService({ db, clock = Date.now, whatsappEnabled = () => false }) 
       const sequence = (n.data()?.value || 0) + 1;
       const id = 'TROPI-' + String(sequence).padStart(3, '0');
       const order = {
-        id, date: at, updatedAt: at, status: 'recebido', total: data.total,
+        id, date: at, updatedAt: at, status: 'recebido', expiresAt: at + R.PENDING_REQUEST_TTL, loyaltyApplied: false, total: data.total,
         customer: { id: user.uid, name: data.name, phone: data.phone },
         payment: data.payment, cardType: data.cardType, delivery: data.delivery, neighborhood: data.neighborhood, deliveryFee: data.deliveryFee, payableTotal: data.payableTotal, address: data.address, reference: data.reference,
         change: data.change, lines: data.lines, reward: data.reward, redeemsReward: data.redeemsReward,
         whatsappConsent: { granted: data.whatsappOptIn, at, version: 'tropi-status-v1', text: OPT_IN_TEXT, source: 'checkout' },
         notifications: {}, statusHistory: [{ status: 'recebido', at, actor: user.uid }]
       };
-      const nextCounts = { qualifying: (counts.qualifying || 0) + (data.reward ? 0 : 1), redeemed: (counts.redeemed || 0) + (data.redeemsReward ? 1 : 0) };
+      const nextCounts = { version: 2, qualifying: available.qualifying, redeemed: available.redeemed, reserved: available.reserved + (data.redeemsReward ? 1 : 0) };
       tx.create(db.doc('orders/' + id), order);
-      tx.set(customerRef, { id: user.uid, name: data.name, phone: data.phone, loyalty: nextCounts, updatedAt: at }, { merge: true });
+      tx.set(customerRef, { id: user.uid, name: data.name, phone: data.phone, loyalty: nextCounts, pendingOrderId: id, updatedAt: at }, { merge: true });
       tx.set(counter, { value: sequence });
       tx.set(rateRef, { startedAt: inWindow ? rate.startedAt : at, count: inWindow ? rate.count + 1 : 1 });
       if (ipRateRef) tx.set(ipRateRef,{startedAt:ipInWindow?ipRate.startedAt:at,count:ipInWindow?ipRate.count+1:1});
@@ -46,6 +106,13 @@ function createService({ db, clock = Date.now, whatsappEnabled = () => false }) 
     requireUser(user, true);
     const id = orderId(input?.id), status = input?.status, at = clock();
     const ref = db.doc('orders/' + id);
+    const initial = await ref.get();
+    if (!initial.exists) fail('not-found', 'Pedido não encontrado.');
+    await ensureLoyalty(initial.data().customer.id);
+    if (R.pendingExpired(initial.data(), at)) {
+      await expireOrder(id);
+      fail('failed-precondition', 'Este pedido expirou sem confirmação da loja.');
+    }
     return db.runTransaction(async tx => {
       const snap = await tx.get(ref);
       if (!snap.exists) fail('not-found', 'Pedido não encontrado.');
@@ -57,10 +124,16 @@ function createService({ db, clock = Date.now, whatsappEnabled = () => false }) 
       const cashRef = control.data()?.activeId ? db.doc('cashSessions/' + control.data().activeId) : null;
       const cash = cashRef ? await tx.get(cashRef) : null;
       const customerRef = db.doc('customers/' + old.customer.id);
-      const customer = status === 'cancelado' ? await tx.get(customerRef) : null;
+      const customer = await tx.get(customerRef), counts = loyalty(customer.data()?.loyalty);
+      const customerUpdate = { updatedAt: at };
+      if (customer.data()?.pendingOrderId === id) customerUpdate.pendingOrderId = null;
       const next = { ...old, status, updatedAt: at, statusHistory: [...(old.statusHistory || []), { status, at, actor: user.uid }] };
       if (status === 'concluido') {
         next.completedAt = at;
+        next.loyaltyApplied = true;
+        customerUpdate.loyalty = { version: 2, qualifying: counts.qualifying + (!old.reward && old.total > 0 ? 1 : 0),
+          redeemed: counts.redeemed + (old.reward || old.redeemsReward ? 1 : 0),
+          reserved: Math.max(0, counts.reserved - (old.reward || old.redeemsReward ? 1 : 0)) };
         if (cash?.exists && cash.data().status === 'open') {
           const booked = R.bookCashSale([cash.data()], next, at)[0];
           tx.set(cashRef, booked);
@@ -68,8 +141,8 @@ function createService({ db, clock = Date.now, whatsappEnabled = () => false }) 
         }
       }
       if (status === 'cancelado') {
-        const counts = customer.data()?.loyalty || {};
-        tx.set(customerRef, { loyalty: { qualifying: Math.max(0, (counts.qualifying || 0) - (old.reward ? 0 : 1)), redeemed: Math.max(0, (counts.redeemed || 0) - (old.redeemsReward ? 1 : 0)) }, updatedAt: at }, { merge: true });
+        customerUpdate.loyalty = { version: 2, qualifying: counts.qualifying, redeemed: counts.redeemed,
+          reserved: Math.max(0, counts.reserved - (old.reward || old.redeemsReward ? 1 : 0)) };
       }
       if (['preparando', 'entrega'].includes(status)) {
         let state = 'disabled';
@@ -85,6 +158,7 @@ function createService({ db, clock = Date.now, whatsappEnabled = () => false }) 
         }
         next.notifications = { ...(old.notifications || {}), [status]: { state, at } };
       }
+      tx.set(customerRef, customerUpdate, { merge: true });
       tx.set(ref, next);
       return { order: next };
     });
@@ -135,6 +209,6 @@ function createService({ db, clock = Date.now, whatsappEnabled = () => false }) 
     const snapshot = await db.collection('orders').where('date', '>=', begin).where('date', '<=', end).get();
     return R.orderReport(snapshot.docs.map(d => d.data()), input);
   }
-  return { createOrder, updateStatus, cashAction, report };
+  return { createOrder, updateStatus, cashAction, report, getLoyalty, expirePending };
 }
 module.exports = { createService, OPT_IN_TEXT };
