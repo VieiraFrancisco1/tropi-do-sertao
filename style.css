@@ -67,5 +67,63 @@ html{scroll-padding-top:82px}.header-inner{min-height:76px;padding:6px 22px;grid
 #customer-neighborhood{min-height:46px;width:100%;background:#fff;color:#24482a;padding:10px 12px;border-radius:12px}
 @media(max-width:420px){.store-status{font-size:10px;padding:6px 7px}.store-strip{gap:5px;flex-wrap:wrap;justify-content:space-between}}
 
-/* Fotos novas: mostrar o produto inteiro, sem cortes nem distorcao. */
-.product-photo img,.extra-card>img{object-fit:contain;object-position:center;}
+/* Enquadramento fotográfico: mantém o produto inteiro e preenche as laterais
+   dos retratos verticais com a própria cena, sem fundo vazio ou deformação. */
+.product-photo,
+.extra-photo{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  background:#f2ead8;
+}
+.product-photo{
+  display:block;
+  width:100%;
+}
+.extra-photo{
+  display:block;
+  width:100%;
+  aspect-ratio:1.35;
+  flex:none;
+}
+.product-photo .photo-backdrop,
+.extra-photo .photo-backdrop{
+  position:absolute;
+  inset:0;
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center;
+  filter:blur(8px) saturate(.95);
+  transform:scale(1.1);
+  opacity:.85;
+  pointer-events:none;
+  z-index:0;
+  transition:none;
+}
+.product-photo .photo-main,
+.extra-photo .photo-main{
+  position:relative;
+  display:block;
+  width:100%;
+  height:100%;
+  max-width:none;
+  object-fit:contain;
+  object-position:center;
+  transform:scale(1.035);
+  z-index:1;
+  transition:transform .25s ease;
+}
+.product-photo:hover .photo-main,
+.extra-card:hover .photo-main{
+  transform:scale(1.055);
+}
+.product-photo .size-badge{z-index:2}
+@media(prefers-reduced-motion:reduce){
+  .product-photo .photo-main,
+  .extra-photo .photo-main{transition:none}
+}
+/* Os demais cards usam a mesma proporção e não deixam fotos invadir
+   os títulos, valores ou botões de adicionar. */
+.product-card .product-info{position:relative;z-index:1}
