@@ -135,3 +135,15 @@ test('health reports a database failure without leaking credentials or upstream 
   assert.equal(response.status,503);
   assert.deepEqual(await response.json(),{status:'unavailable',database:'unavailable',diagnostic:{status:403,code:'PERMISSION_DENIED'},whatsappEnabled:false});
 });
+
+test('checkout validation verifies authenticated customer prices without recording an order',async()=>{
+ const db=fakeDb(),api=configure(baseEnv,{db,authorize:async()=>({uid:'shopper1',admin:false}),checkApp:async()=>true});
+ const input={requestKey:'quote-request-00001',name:'Cliente Teste',phone:'88999999999',payment:'Pix',delivery:'Entrega',neighborhood:'Alto do Motor',address:'Rua de teste, 1',lines:[{productId:'300',qty:1,extras:[],reward:false}]};
+ const result=await api.handle(makeReq('validateCheckout',input));
+ assert.equal(result.status,200);
+ assert.deepEqual(await result.json(),{total:600,deliveryFee:300,payableTotal:900});
+ assert.equal(db.store.size,0);
+ const forbidden=await api.handle(makeReq('validateCheckout',input,{authorization:''}));
+ assert.equal(forbidden.status,401);
+ assert.equal(db.store.size,0);
+});

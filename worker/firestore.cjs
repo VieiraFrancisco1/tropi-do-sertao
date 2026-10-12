@@ -143,6 +143,17 @@ function createFirestore({ projectId, serviceAccount, fetchImpl = fetch, now = D
     }
     throw new Error('Firestore transaction retries exhausted');
   }
-  return {doc,collection,runTransaction,accessToken:token};
+  async function writeAccess(){
+    const bearer=await token();
+    // Read-only IAM test; it does not grant or change any permission.
+    const response=await fetchImpl('https://cloudresourcemanager.googleapis.com/v1/projects/'+projectId+':testIamPermissions',{
+      method:'POST',headers:{authorization:'Bearer '+bearer,'content-type':'application/json'},
+      body:JSON.stringify({permissions:['datastore.entities.create','datastore.entities.update']})
+    });
+    if(!response.ok)return 'unknown';
+    const body=await response.json(),permissions=body.permissions||[];
+    return ['datastore.entities.create','datastore.entities.update'].every(permission=>permissions.includes(permission))?'ok':'missing';
+  }
+  return {doc,collection,runTransaction,accessToken:token,writeAccess};
 }
 module.exports={createFirestore,valueOf,fromValue,fieldsOf,docData,dottedToNested,DbError};

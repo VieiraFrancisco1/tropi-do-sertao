@@ -2,6 +2,14 @@
 const { R, fail, digest, requireUser, key, orderId, text, sanitizeCheckout, loyalty } = require('./domain.cjs');
 const OPT_IN_TEXT = 'Quero receber no WhatsApp atualizações da TropiSertão sobre o preparo e a entrega deste pedido. Posso parar respondendo SAIR.';
 function createService({ db, clock = Date.now, whatsappEnabled = () => false }) {
+  async function validateCheckout(user,input){
+    requireUser(user);
+    const data=sanitizeCheckout(input);
+    const customer=await db.doc('customers/'+user.uid).get();
+    const checkoutError=R.validateCheckout(data.lines,loyalty(customer.data()?.loyalty||{}));
+    if(checkoutError)fail('failed-precondition',checkoutError);
+    return {total:data.total,deliveryFee:data.deliveryFee,payableTotal:data.payableTotal};
+  }
   async function createOrder(user, input) {
     requireUser(user);
     const data = sanitizeCheckout(input), at = clock();
@@ -135,6 +143,6 @@ function createService({ db, clock = Date.now, whatsappEnabled = () => false }) 
     const snapshot = await db.collection('orders').where('date', '>=', begin).where('date', '<=', end).get();
     return R.orderReport(snapshot.docs.map(d => d.data()), input);
   }
-  return { createOrder, updateStatus, cashAction, report };
+  return { createOrder, validateCheckout, updateStatus, cashAction, report };
 }
 module.exports = { createService, OPT_IN_TEXT };
