@@ -17,6 +17,18 @@ test('invalid catalog, duplicate extras, quantity and missing combo juice are re
     { productId: 'combo-tropi', extras: [], qty: 1 }
   ]) assert.throws(() => sanitizeCheckout({ ...fixture(), lines: [line] }), /inválido/);
 });
+test('taxas por bairro são calculadas no servidor, sem confiar no preço do navegador', () => {
+ const base=fixture();
+ const centro=sanitizeCheckout({...base,delivery:'Entrega',neighborhood:'Centro',address:'Rua Centro, 10'});
+ const floresta=sanitizeCheckout({...base,delivery:'Entrega',neighborhood:'Floresta',address:'Rua Floresta, 2'});
+ const anafue=sanitizeCheckout({...base,delivery:'Entrega',neighborhood:'Anafuê',address:'Rua Anafuê, 3'});
+ assert.equal(centro.deliveryFee,0);
+ assert.equal(floresta.deliveryFee,500);
+ assert.equal(anafue.deliveryFee,600);
+ assert.equal(floresta.payableTotal,floresta.total+500);
+ assert.throws(()=>sanitizeCheckout({...base,delivery:'Entrega',address:'Rua A, 10',neighborhood:'Bairro Inexistente'}),/bairro/);
+ assert.throws(()=>sanitizeCheckout({...base,delivery:'Entrega',address:'Rua B, 20',neighborhood:'Floresta',payment:'Dinheiro',change:base.total}),/troco/);
+});
 test('delivery address, payment, phone and change validated on server', () => {
   assert.throws(() => sanitizeCheckout({ ...fixture(), delivery: 'Entrega' }), /endereço/);
   assert.throws(() => sanitizeCheckout({ ...fixture(), payment: 'fraude' }), /pagamento/);

@@ -118,7 +118,7 @@ if(LIVE){
    cloudLoyalty=result.loyalty;profile={id:order.customer.id,name:order.customer.name,phone:order.customer.phone};
    orders=[order,...orders.filter(o=>o.id!==order.id)];cart=[];updateCart();
    localStorage.removeItem('tropisertao-live-checkout-key');$('checkout-form').reset();deliveryFields();paymentFields();
-   $('success-receipt').innerHTML=`<span>${esc(order.id)}</span><strong>${money(order.total)}</strong>`;
+   $('success-receipt').innerHTML=`<span>${esc(order.id)}</span><strong>${money(order.payableTotal??order.total)}</strong>`;
    $('success-loyalty').innerHTML=loyaltyMarkup(!order.reward);
    finishWhatsAppHandoff(order,whatsappTab);
   }catch(error){whatsappTab?.close();cloudError(error);}finally{submitting=false;button.disabled=false;}

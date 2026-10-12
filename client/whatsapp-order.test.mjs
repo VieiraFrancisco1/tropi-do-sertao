@@ -12,12 +12,12 @@ const makeUrl = new Function('money', 'STORE_WHATSAPP_NUMBER', app.slice(begin, 
 test('cria link da loja com mensagem completa, pedido e entrega', () => {
  const order = { id:'TROPI-123', customer:{name:'Maria',phone:'5588999999999'},
    lines:[{label:'2× Salada + ninho',subtotal:2400,notes:'Sem banana'}],
-   total:2400, delivery:'Entrega', address:'Rua A, 10',reference:'Casa azul',payment:'Dinheiro',change:3000 };
+   total:2400, delivery:'Entrega', neighborhood:'Floresta',deliveryFee:500,payableTotal:2900,address:'Rua A, 10',reference:'Casa azul',payment:'Dinheiro',change:3000 };
  const url = new URL(makeUrl(order));
  const message = url.searchParams.get('text');
  assert.equal(url.origin,'https://wa.me');
  assert.equal(url.pathname,'/5588996862960');
- for(const phrase of ['TROPI-123','Maria','5588999999999','Salada + ninho','Sem banana','Rua A, 10','Casa azul','Dinheiro',money(2400),money(3000)])assert.ok(message.includes(phrase), phrase);
+ for(const phrase of ['TROPI-123','Maria','5588999999999','Salada + ninho','Sem banana','Rua A, 10','Casa azul','Floresta','Taxa de entrega', 'Dinheiro',money(2400),money(2900),money(3000)])assert.ok(message.includes(phrase), phrase);
  assert.ok(message.includes(String.fromCharCode(10)+'*Itens do pedido:*'));
  assert.equal(message.includes(String.fromCharCode(92)+'n'), false, 'Não usar barra + n literal em vez de quebra de linha');
 });
